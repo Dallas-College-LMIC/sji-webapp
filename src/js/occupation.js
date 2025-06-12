@@ -30,8 +30,11 @@ export class OccupationMapController {
         }
         
         try {
-            const occupationIds = await this.apiService.getOccupationIds();
-            console.log("Loaded occupation IDs:", occupationIds);
+            const response = await this.apiService.getOccupationIds();
+            console.log("Loaded occupation IDs response:", response);
+            
+            // Handle new API structure - extract occupation_ids array from response
+            const occupationIds = response.occupation_ids || response;
             this.populateOccupationDropdown(occupationIds);
             
             if (loadingElement) {

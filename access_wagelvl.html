@@ -4,7 +4,7 @@
         <meta charset="UTF-8" />
         <meta http-equiv="X-UA-Compatible" content="IE=edge" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>LMIC DFW Employment Access Index - Job Access by Occupation</title>
+        <title>LMIC DFW Employment Access Index - Job Access by Wage Level</title>
 
         <script src="https://api.mapbox.com/mapbox-gl-js/v1.12.0/mapbox-gl.js"></script>
         <link
@@ -22,16 +22,7 @@
             integrity="sha384-b5kHyXgcpbZJO/tY9Ul7kGkf1S0CWuKcCD38l8YkeH8z8QjE0GmW1gYU5S9FOnJ0"
             crossorigin="anonymous"
         ></script>
-        
-        <!-- Select2 for searchable dropdown -->
-        <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-        <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-        <script src="../src/js/config.js"></script>
-        <script src="../src/js/api-standalone.js"></script>
-        <script src="../src/js/mapUtils-standalone.js"></script>
-        <script src="../src/js/occupation-standalone.js"></script>
-        <link rel="stylesheet" href="../src/styles/shared.css">
+        <script type="module" src="/src/js/wage-main.js"></script>
     </head>
 
     <body>
@@ -62,10 +53,10 @@
             >
                 <ul class="navbar-nav p-0">
                     <a class="nav-link" href="index.html"> Project Home </a>
-                    <a class="nav-link" href="access_wagelvl.html">
+                    <a class="nav-link active" href="access_wagelvl.html">
                         Job Access by Wage Level
                     </a>
-                    <a class="nav-link active" href="access_occupation.html">
+                    <a class="nav-link" href="access_occupation.html">
                         Job Access by Occupation
                     </a>
                     <a class="nav-link">
@@ -82,15 +73,20 @@
             <div class="container g-0">
                 <div class="row g-0 justify-content-start">
                     <div class="col-auto" id="header">
-                        Transit Travelshed Index - By Occupation
+                        Transit Travelshed Index
                     </div>
                 </div>
                 <div class="row g-0 justify-content-center">
                     <div class="col-12">
-                        <select class="form-select" id="occupation-select" style="width: 100%;">
-                            <option value="">Select an occupation...</option>
+                        <select class="form-select" id="tti">
+                            <option value="pop">Access to Jobs</option>
+                            <option value="job">
+                                Access to Living Wage Jobs
+                            </option>
+                            <option value="lab">
+                                Access to Not Living Wage Jobs
+                            </option>
                         </select>
-                        <div id="loading" style="display: none;">Loading occupations...</div>
                     </div>
                 </div>
                 <div class="row g-0 justify-content-center">
@@ -115,11 +111,5 @@
             </div>
         </div>
 
-        <script>
-            "use strict";
-            
-            // Initialize the occupation map controller
-            const occupationController = new OccupationMapController('mainmap');
-        </script>
     </body>
 </html>
