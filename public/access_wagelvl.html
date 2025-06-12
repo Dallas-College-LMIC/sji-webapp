@@ -1,0 +1,165 @@
+<!doctype html>
+<html>
+    <head>
+        <meta charset="UTF-8" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>LMIC DFW Employment Access Index - Job Access by Wage Level</title>
+
+        <script src="https://api.mapbox.com/mapbox-gl-js/v1.12.0/mapbox-gl.js"></script>
+        <link
+            href="https://api.mapbox.com/mapbox-gl-js/v1.12.0/mapbox-gl.css"
+            rel="stylesheet"
+        />
+        <link
+            href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta2/dist/css/bootstrap.min.css"
+            rel="stylesheet"
+            integrity="sha384-BmbxuPwQa2lc/FVzBcNJ7UAyJxM6wuqIj61tLrc4wSX0szH/Ev+nYRRuWlolflfl"
+            crossorigin="anonymous"
+        />
+        <script
+            src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta2/dist/js/bootstrap.bundle.min.js"
+            integrity="sha384-b5kHyXgcpbZJO/tY9Ul7kGkf1S0CWuKcCD38l8YkeH8z8QjE0GmW1gYU5S9FOnJ0"
+            crossorigin="anonymous"
+        ></script>
+        <script src="../src/js/config.js"></script>
+        <script src="../src/js/api-standalone.js"></script>
+        <script src="../src/js/mapUtils-standalone.js"></script>
+        <link rel="stylesheet" href="../src/styles/shared.css">
+    </head>
+
+    <body>
+        <nav
+            class="navbar navbar-expand-lg navbar-dark g-0 p-0 m-0"
+            id="banner"
+        >
+            <a
+                class="navbar-brand p-0"
+                href="https://www.dallascollege.edu/business-industry/lmic/pages/default.aspx"
+            >
+                <img
+                    src="https://raw.githubusercontent.com/Dallas-College-LMIC/spatial-jobs-index/e8094a75034b8627e629a350e0f1a2a81a0f468a/DCLOGO_RGB_MASTER_MARK-V-WHITE.png"
+                    id="dc_logo"
+                />
+            </a>
+            <button
+                class="navbar-toggler"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#bannertoggle"
+            >
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div
+                class="collapse navbar-collapse p-0 justify-content-start"
+                id="bannertoggle"
+            >
+                <ul class="navbar-nav p-0">
+                    <a class="nav-link" href="index.html"> Project Home </a>
+                    <a class="nav-link active" href="access_wagelvl.html">
+                        Job Access by Wage Level
+                    </a>
+                    <a class="nav-link" href="access_occupation.html">
+                        Job Access by Occupation
+                    </a>
+                    <a class="nav-link">
+                        Job Access by School of (in progress)
+                    </a>
+                    <a class="nav-link"> Travelsheds by Tract (in progress) </a>
+                </ul>
+            </div>
+        </nav>
+
+        <div class="container-fluid p-0" id="mainmap"></div>
+
+        <div id="legend">
+            <div class="container g-0">
+                <div class="row g-0 justify-content-start">
+                    <div class="col-auto" id="header">
+                        Transit Travelshed Index
+                    </div>
+                </div>
+                <div class="row g-0 justify-content-center">
+                    <div class="col-12">
+                        <select class="form-select" id="tti">
+                            <option value="pop">Access to Jobs</option>
+                            <option value="job">
+                                Access to Living Wage Jobs
+                            </option>
+                            <option value="lab">
+                                Access to Not Living Wage Jobs
+                            </option>
+                        </select>
+                    </div>
+                </div>
+                <div class="row g-0 justify-content-center">
+                    <hr />
+                    <div class="col-12">
+                        <img src="images/colorbar.png" id="colorbar" />
+                    </div>
+                </div>
+                <div class="row g-0 justify-content-center">
+                    <hr />
+                    <div class="col-auto">
+                        <a
+                            class="btn btn-primary btn-sm"
+                            id="exp"
+                            href="#"
+                            target="blank"
+                        >
+                            Export
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            "use strict";
+            
+            const mapManager = new MapManager('mainmap');
+            const apiService = new ApiService();
+
+            mapManager.onStyleLoad(async () => {
+                try {
+                    const geojsonData = await apiService.getGeojsonData();
+                    console.log("Fetched data:", geojsonData);
+                    
+                    // Add source with fetched data
+                    mapManager.addSource("tti_data", geojsonData);
+
+                    // Layer configurations
+                    const layers = [
+                        { id: "pop", visibility: "visible", property: "all_jobs_zscore_cat", title: "Access to All Jobs", scoreProperty: "all_jobs_zscore" },
+                        { id: "job", visibility: "none", property: "living_wage_zscore_cat", title: "Access to Living Wage Jobs", scoreProperty: "living_wage_zscore" },
+                        { id: "lab", visibility: "none", property: "not_living_wage_zscore_cat", title: "Access to Not Living Wage Jobs", scoreProperty: "Not_Living_Wage_zscore" }
+                    ];
+
+                    // Add layers and popup events
+                    layers.forEach(layer => {
+                        mapManager.addLayer(layer.id, "tti_data", layer.property, layer.visibility);
+                        mapManager.addPopupEvents(layer.id, layer.title, layer.scoreProperty);
+                    });
+
+                    // Setup dropdown listener
+                    const tti = document.getElementById("tti");
+                    const layerOrder = ["pop", "job", "lab"];
+
+                    tti.addEventListener("change", function () {
+                        const chosenLayer = this.value;
+                        layerOrder.forEach((layer) => {
+                            mapManager.setLayerVisibility(layer, layer === chosenLayer ? "visible" : "none");
+                        });
+                        document.getElementById("exp").href = apiService.getExportUrl();
+                    });
+
+                    // Set initial export URL
+                    document.getElementById("exp").href = apiService.getExportUrl();
+
+                } catch (error) {
+                    console.error("Error loading data:", error);
+                }
+            });
+        </script>
+    </body>
+</html>
