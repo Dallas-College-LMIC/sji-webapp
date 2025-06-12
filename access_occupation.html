@@ -1,0 +1,465 @@
+<!doctype html>
+<html>
+    <head>
+        <meta charset="UTF-8" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>LMIC DFW Employment Access Index - Job Access by Occupation</title>
+
+        <script src="https://api.mapbox.com/mapbox-gl-js/v1.12.0/mapbox-gl.js"></script>
+        <link
+            href="https://api.mapbox.com/mapbox-gl-js/v1.12.0/mapbox-gl.css"
+            rel="stylesheet"
+        />
+        <link
+            href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta2/dist/css/bootstrap.min.css"
+            rel="stylesheet"
+            integrity="sha384-BmbxuPwQa2lc/FVzBcNJ7UAyJxM6wuqIj61tLrc4wSX0szH/Ev+nYRRuWlolflfl"
+            crossorigin="anonymous"
+        />
+        <script
+            src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta2/dist/js/bootstrap.bundle.min.js"
+            integrity="sha384-b5kHyXgcpbZJO/tY9Ul7kGkf1S0CWuKcCD38l8YkeH8z8QjE0GmW1gYU5S9FOnJ0"
+            crossorigin="anonymous"
+        ></script>
+        
+        <!-- Select2 for searchable dropdown -->
+        <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+        <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+        <script src="config.js"></script>
+
+        <style>
+            body {
+                margin: 0;
+                padding: 0;
+                font-family: sans-serif;
+            }
+
+            #banner {
+                background-color: rgba(0, 51, 133, 1);
+                z-index: 1000;
+            }
+
+            #dc_logo {
+                height: 4rem;
+            }
+
+            .navbar-brand {
+                margin-left: 1rem;
+                margin-right: 1rem;
+                margin-top: 1rem;
+                margin-bottom: 1rem;
+            }
+
+            .navbar-toggler {
+                border-width: 0.2rem;
+                padding: 0.1rem;
+                margin-right: 1rem;
+            }
+
+            .nav-link {
+                font-size: 1rem;
+                font-weight: bold;
+                padding: 0.5rem 0.5rem 0.5rem 0.5rem;
+                margin-left: 0.5rem;
+                margin-right: 0.5rem;
+            }
+
+            #mainmap {
+                position: absolute;
+                top: 4rem;
+                bottom: 0;
+                width: 100%;
+                height: auto;
+                z-index: -1000;
+            }
+
+            #legend {
+                position: absolute;
+                top: 5rem;
+                right: 1rem;
+                width: auto;
+                height: auto;
+                max-height: 90%;
+                padding-top: 0rem;
+                padding-right: 1rem;
+                padding-left: 1rem;
+                padding-bottom: 0rem;
+                color: rgba(0, 0, 0, 0.9);
+                background-color: rgba(255, 255, 255, 0.9);
+                font-size: 0.9rem;
+                overflow: auto;
+                box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
+                border-radius: 4px;
+            }
+
+            .row {
+                margin-top: 1rem;
+            }
+
+            #header {
+                font-weight: bold;
+            }
+
+            .form-select, .select2-container {
+                font-size: 0.9rem;
+            }
+            
+            .select2-container--default .select2-selection--single {
+                height: calc(1.5em + .5rem + 2px);
+                padding: .25rem .5rem;
+                border: 1px solid #ced4da;
+                border-radius: .25rem;
+            }
+            
+            .select2-container--default .select2-selection--single .select2-selection__rendered {
+                line-height: 1.5;
+                padding-left: 0;
+                color: #495057;
+            }
+            
+            .select2-container--default .select2-selection--single .select2-selection__arrow {
+                height: calc(1.5em + .5rem);
+            }
+
+            #colorbar {
+                width: 15rem;
+            }
+
+            .btn {
+                background-color: rgba(229, 38, 38, 0.9);
+                border-style: none;
+                margin-bottom: 1rem;
+                width: 8rem;
+            }
+
+            .btn:hover {
+                background-color: rgba(229, 38, 38, 1);
+            }
+
+            .btn:focus {
+                background-color: rgba(229, 38, 38, 1);
+            }
+
+            .btn:active {
+                background-color: rgba(229, 38, 38, 1);
+            }
+            
+            #loading {
+                font-size: 0.8rem;
+                color: #666;
+                text-align: center;
+                margin-top: 0.5rem;
+            }
+        </style>
+    </head>
+
+    <body>
+        <nav
+            class="navbar navbar-expand-lg navbar-dark g-0 p-0 m-0"
+            id="banner"
+        >
+            <a
+                class="navbar-brand p-0"
+                href="https://www.dallascollege.edu/business-industry/lmic/pages/default.aspx"
+            >
+                <img
+                    src="https://raw.githubusercontent.com/Dallas-College-LMIC/spatial-jobs-index/e8094a75034b8627e629a350e0f1a2a81a0f468a/DCLOGO_RGB_MASTER_MARK-V-WHITE.png"
+                    id="dc_logo"
+                />
+            </a>
+            <button
+                class="navbar-toggler"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#bannertoggle"
+            >
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div
+                class="collapse navbar-collapse p-0 justify-content-start"
+                id="bannertoggle"
+            >
+                <ul class="navbar-nav p-0">
+                    <a class="nav-link" href="index.html"> Project Home </a>
+                    <a class="nav-link" href="access_wagelvl.html">
+                        Job Access by Wage Level
+                    </a>
+                    <a class="nav-link active" href="access_occupation.html">
+                        Job Access by Occupation
+                    </a>
+                    <a class="nav-link">
+                        Job Access by School of (in progress)
+                    </a>
+                    <a class="nav-link"> Travelsheds by Tract (in progress) </a>
+                </ul>
+            </div>
+        </nav>
+
+        <div class="container-fluid p-0" id="mainmap"></div>
+        <!-- placeholder for main map -->
+
+        <div id="legend">
+            <div class="container g-0">
+                <div class="row g-0 justify-content-start">
+                    <div class="col-auto" id="header">
+                        Transit Travelshed Index - By Occupation
+                    </div>
+                </div>
+                <div class="row g-0 justify-content-center">
+                    <div class="col-12">
+                        <select class="form-select" id="occupation-select" style="width: 100%;">
+                            <option value="">Select an occupation...</option>
+                        </select>
+                        <div id="loading" style="display: none;">Loading occupations...</div>
+                    </div>
+                </div>
+                <div class="row g-0 justify-content-center">
+                    <hr />
+                    <div class="col-12">
+                        <img src="colorbar.png" id="colorbar" />
+                    </div>
+                </div>
+                <div class="row g-0 justify-content-center">
+                    <hr />
+                    <div class="col-auto">
+                        <a
+                            class="btn btn-primary btn-sm"
+                            id="exp"
+                            href="#"
+                            target="blank"
+                        >
+                            Export
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            "use strict";
+            mapboxgl.accessToken =
+                "pk.eyJ1IjoiY2dpbGNocmllc3QtZGNjY2QiLCJhIjoiY200aXNueG5hMDV6czJtcTBweTFlZG9weSJ9.BV1l4NoP08wC2vlkhYR2Pg";
+            var map = new mapboxgl.Map({
+                container: "mainmap",
+                style: "mapbox://styles/mapbox/light-v10",
+                hash: true,
+                attributionControl: true,
+                customAttribution:
+                    '<b><a href="https://github.com/NYCPlanning/td-travelshed/blob/master/Transit%20Travelshed.pdf" target="_blank">Detailed Methodology</a></b>',
+                preserveDrawingBuffer: true,
+                center: [-97.0336, 32.8999],
+                zoom: 10.8,
+            });
+            
+            let currentOccupationId = null;
+            let geojsonData = null;
+
+            map.on("style.load", function () {
+                // Add controls first
+                map.addControl(
+                    new mapboxgl.FullscreenControl({
+                        container: document.querySelector("body"),
+                    }),
+                    "bottom-left",
+                );
+                map.addControl(
+                    new mapboxgl.NavigationControl({
+                        showCompass: true,
+                        showZoom: true,
+                        visualizePitch: true,
+                    }),
+                    "bottom-left",
+                );
+                
+                // Initialize the map with empty source
+                map.addSource("occupation_data", {
+                    type: "geojson",
+                    data: {
+                        type: "FeatureCollection",
+                        features: []
+                    }
+                });
+                
+                // Load occupation IDs
+                loadOccupationIds();
+            });
+            
+            function loadOccupationIds() {
+                document.getElementById('loading').style.display = 'block';
+                
+                fetch(`${window.CONFIG.API_BASE_URL}/occupation_ids`, {
+                    headers: {
+                        Authorization: "Basic " + btoa(`${window.CONFIG.API_USERNAME}:${window.CONFIG.API_PASSWORD}`),
+                    },
+                })
+                .then((res) => {
+                    if (!res.ok) {
+                        throw new Error(`HTTP error! status: ${res.status}`);
+                    }
+                    return res.json();
+                })
+                .then((occupationIds) => {
+                    console.log("Loaded occupation IDs:", occupationIds);
+                    populateOccupationDropdown(occupationIds);
+                    document.getElementById('loading').style.display = 'none';
+                })
+                .catch((error) => {
+                    console.error("Error loading occupation IDs:", error);
+                    document.getElementById('loading').textContent = 'Error loading occupations';
+                });
+            }
+            
+            function populateOccupationDropdown(occupationIds) {
+                const select = $('#occupation-select');
+                
+                // Clear existing options except the first one
+                select.find('option:not(:first)').remove();
+                
+                // Add occupation options
+                occupationIds.forEach(id => {
+                    select.append(new Option(id, id));
+                });
+                
+                // Initialize Select2 for searchable dropdown
+                select.select2({
+                    placeholder: "Search and select an occupation...",
+                    allowClear: true,
+                    width: '100%'
+                });
+                
+                // Set up change event listener
+                select.on('change', function() {
+                    const selectedOccupation = $(this).val();
+                    if (selectedOccupation) {
+                        loadOccupationData(selectedOccupation);
+                    } else {
+                        clearMap();
+                    }
+                });
+            }
+            
+            function loadOccupationData(occupationId) {
+                currentOccupationId = occupationId;
+                
+                // Fetch GeoJSON data for the selected occupation
+                // Assuming the API endpoint accepts occupation ID as a parameter
+                fetch(`${window.CONFIG.API_BASE_URL}/geojson?occupation_id=${occupationId}`, {
+                    headers: {
+                        Authorization: "Basic " + btoa(`${window.CONFIG.API_USERNAME}:${window.CONFIG.API_PASSWORD}`),
+                    },
+                })
+                .then((res) => {
+                    if (!res.ok) {
+                        throw new Error(`HTTP error! status: ${res.status}`);
+                    }
+                    return res.json();
+                })
+                .then((data) => {
+                    console.log("Fetched occupation data:", data);
+                    geojsonData = data;
+                    
+                    // Update the map source
+                    map.getSource('occupation_data').setData(data);
+                    
+                    // Remove existing layers if any
+                    if (map.getLayer('occupation-layer')) {
+                        map.removeLayer('occupation-layer');
+                    }
+                    
+                    // Add the occupation layer
+                    addOccupationLayer();
+                    
+                    // Update export link
+                    document.getElementById('exp').href = 
+                        `${window.CONFIG.API_BASE_URL}/geojson?occupation_id=${occupationId}`;
+                })
+                .catch((error) => {
+                    console.error("Error loading occupation data:", error);
+                });
+            }
+            
+            function addOccupationLayer() {
+                // Assuming the data has a zscore property for the occupation
+                const propertyName = `occupation_${currentOccupationId}_zscore_cat`;
+                
+                const layerColor = [
+                    "match",
+                    ["get", propertyName],
+                    "<-2.5SD", "rgba(43, 131, 186, 0.8)",
+                    "-2.5SD ~ -1.5SD", "rgba(128, 191, 172, 0.8)",
+                    "-1.5SD ~ -0.5SD", "rgba(199, 233, 173, 0.8)",
+                    "-0.5SD ~ +0.5SD", "rgba(255, 255, 191, 0.8)",
+                    "+0.5SD ~ +1.5SD", "rgba(254, 201, 128, 0.8)",
+                    "+1.5SD ~ +2.5SD", "rgba(241, 124, 74, 0.8)",
+                    ">=+2.5SD", "rgba(215, 25, 28, 0.8)",
+                    "#000000"
+                ];
+                
+                map.addLayer({
+                    id: 'occupation-layer',
+                    type: 'fill',
+                    source: 'occupation_data',
+                    layout: {
+                        visibility: 'visible'
+                    },
+                    paint: {
+                        'fill-color': layerColor,
+                        'fill-outline-color': 'rgba(0, 0, 0, 0.1)'
+                    }
+                });
+                
+                // Add popup
+                addPopupForOccupation();
+            }
+            
+            function addPopupForOccupation() {
+                const popup = new mapboxgl.Popup({
+                    closeButton: true,
+                    closeOnClick: false,
+                    anchor: "bottom",
+                    offset: 0,
+                    maxWidth: "none"
+                });
+                
+                map.on('click', 'occupation-layer', (e) => {
+                    const coordinates = e.lngLat;
+                    const properties = e.features[0].properties;
+                    const zscoreProperty = `occupation_${currentOccupationId}_zscore`;
+                    
+                    const description = `<b>Tract: </b><span>${properties.GEOID}</span><br>
+                                     <b>Occupation: </b><span>${currentOccupationId}</span><br>
+                                     <b>Access Score: </b><span>${properties[zscoreProperty] ? properties[zscoreProperty].toFixed(2) : 'N/A'}</span>`;
+                    
+                    popup
+                        .setLngLat(coordinates)
+                        .setHTML(description)
+                        .addTo(map);
+                });
+                
+                map.on('mouseenter', 'occupation-layer', () => {
+                    map.getCanvas().style.cursor = 'pointer';
+                });
+                
+                map.on('mouseleave', 'occupation-layer', () => {
+                    map.getCanvas().style.cursor = '';
+                });
+            }
+            
+            function clearMap() {
+                if (map.getLayer('occupation-layer')) {
+                    map.removeLayer('occupation-layer');
+                }
+                
+                map.getSource('occupation_data').setData({
+                    type: "FeatureCollection",
+                    features: []
+                });
+                
+                currentOccupationId = null;
+                document.getElementById('exp').href = '#';
+            }
+        </script>
+    </body>
+</html>
