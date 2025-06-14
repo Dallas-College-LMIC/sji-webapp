@@ -1,33 +1,20 @@
-import { MapManager } from './mapUtils.js';
-import { ApiService } from './api.js';
+import { BaseMapController } from './controllers/baseMapController.js';
 
-export class OccupationMapController {
+export class OccupationMapController extends BaseMapController {
     constructor(containerId) {
-        this.mapManager = new MapManager(containerId);
-        this.apiService = new ApiService();
+        super(containerId, 'occupation_data');
         this.currentOccupationId = null;
         this.geojsonData = null;
         this.initialize();
     }
 
     async initialize() {
-        this.mapManager.onStyleLoad(async () => {
-            // Initialize the map with empty source
-            this.mapManager.addSource("occupation_data", {
-                type: "FeatureCollection",
-                features: []
-            });
-            
-            // Load occupation IDs
-            await this.loadOccupationIds();
-        });
+        await this.initializeMapWithEmptySource();
+        await this.loadOccupationIds();
     }
 
     async loadOccupationIds() {
-        const loadingElement = document.getElementById('loading');
-        if (loadingElement) {
-            loadingElement.style.display = 'block';
-        }
+        this.showLoading('loading');
         
         try {
             const response = await this.apiService.getOccupationIds();
@@ -37,14 +24,10 @@ export class OccupationMapController {
             const occupationIds = response.occupation_ids || response;
             this.populateOccupationDropdown(occupationIds);
             
-            if (loadingElement) {
-                loadingElement.style.display = 'none';
-            }
+            this.hideLoading('loading');
         } catch (error) {
             console.error("Error loading occupation IDs:", error);
-            if (loadingElement) {
-                loadingElement.textContent = 'Error loading occupations';
-            }
+            this.showError('loading', 'Error loading occupations');
         }
     }
     
@@ -86,7 +69,7 @@ export class OccupationMapController {
             this.geojsonData = data;
             
             // Update the map source
-            this.mapManager.addSource('occupation_data', data);
+            this.mapManager.addSource(this.sourceId, data);
             
             // Remove existing layer if any
             if (this.mapManager.map.getLayer('occupation-layer')) {
@@ -97,7 +80,7 @@ export class OccupationMapController {
             this.addOccupationLayer();
             
             // Update export link
-            document.getElementById('exp').href = this.apiService.getExportUrl({ occupation_id: occupationId });
+            this.updateExportLink({ occupation_id: occupationId });
             
         } catch (error) {
             console.error("Error loading occupation data:", error);
@@ -108,7 +91,7 @@ export class OccupationMapController {
         // Assuming the data has a zscore property for the occupation
         const propertyName = `occupation_${this.currentOccupationId}_zscore_cat`;
         
-        this.mapManager.addLayer('occupation-layer', 'occupation_data', propertyName, 'visible');
+        this.mapManager.addLayer('occupation-layer', this.sourceId, propertyName, 'visible');
         this.addPopupForOccupation();
     }
     
@@ -119,16 +102,11 @@ export class OccupationMapController {
     }
     
     clearMap() {
-        if (this.mapManager.map.getLayer('occupation-layer')) {
-            this.mapManager.map.removeLayer('occupation-layer');
-        }
-        
-        this.mapManager.addSource('occupation_data', {
-            type: "FeatureCollection",
-            features: []
-        });
-        
+        super.clearMap();
         this.currentOccupationId = null;
-        document.getElementById('exp').href = '#';
+    }
+
+    getLayerIds() {
+        return ['occupation-layer'];
     }
 }
