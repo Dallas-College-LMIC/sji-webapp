@@ -219,7 +219,7 @@ export abstract class BaseMapController {
             ErrorHandler.showInlineError(
                 this.containerId,
                 'Failed to load map data. Click to retry.',
-                10000
+                () => this.loadData(config)
             );
 
             // Execute error callback

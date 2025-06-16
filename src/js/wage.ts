@@ -1,4 +1,5 @@
 import { BaseMapController } from './controllers/baseMapController';
+import { ErrorHandler } from './utils/errorHandler';
 import type { LayerConfig } from '../types/api';
 
 export class WageMapController extends BaseMapController {
@@ -29,7 +30,12 @@ export class WageMapController extends BaseMapController {
                 scoreProperty: "Not_Living_Wage_zscore" 
             }
         ];
-        this.initialize();
+        this.initialize().catch(error => {
+            const err = error instanceof Error ? error : new Error(String(error));
+            ErrorHandler.logError(err, 'Controller Initialization', {
+                controller: 'WageMapController'
+            });
+        });
     }
 
     async initialize(): Promise<void> {
