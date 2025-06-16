@@ -9,19 +9,38 @@ export class OccupationMapController extends BaseMapController {
     }
 
     async initialize() {
+        // Initialize map immediately without waiting for occupation IDs
         await this.initializeMapWithEmptySource();
-        await this.loadOccupationIds();
+        
+        // Load occupation IDs asynchronously (non-blocking)
+        this.loadOccupationIds().catch(error => {
+            console.error("Failed to load occupation IDs:", error);
+        });
     }
 
     async loadOccupationIds() {
         this.showLoading('loading');
         
         try {
+            // Check cache first
+            const cachedData = this.getCachedOccupationIds();
+            if (cachedData) {
+                console.log("Using cached occupation IDs");
+                this.populateOccupationDropdown(cachedData);
+                this.hideLoading('loading');
+                return;
+            }
+            
+            // Fetch from API if not cached
             const response = await this.apiService.getOccupationIds();
             console.log("Loaded occupation IDs response:", response);
             
             // Handle new API structure - extract occupation_ids array from response
             const occupationIds = response.occupation_ids || response;
+            
+            // Cache the data
+            this.cacheOccupationIds(occupationIds);
+            
             this.populateOccupationDropdown(occupationIds);
             
             this.hideLoading('loading');
@@ -108,5 +127,52 @@ export class OccupationMapController extends BaseMapController {
 
     getLayerIds() {
         return ['occupation-layer'];
+    }
+    
+    getCachedOccupationIds() {
+        const cacheKey = 'occupation_ids_cache';
+        const cacheTimeKey = 'occupation_ids_cache_time';
+        const cacheTTL = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+        
+        try {
+            const cachedTime = localStorage.getItem(cacheTimeKey);
+            const cachedData = localStorage.getItem(cacheKey);
+            
+            if (!cachedTime || !cachedData) {
+                return null;
+            }
+            
+            const cacheAge = Date.now() - parseInt(cachedTime);
+            
+            // Check if cache is expired
+            if (cacheAge > cacheTTL) {
+                localStorage.removeItem(cacheKey);
+                localStorage.removeItem(cacheTimeKey);
+                return null;
+            }
+            
+            return JSON.parse(cachedData);
+        } catch (error) {
+            console.error("Error reading from cache:", error);
+            return null;
+        }
+    }
+    
+    cacheOccupationIds(occupationIds) {
+        const cacheKey = 'occupation_ids_cache';
+        const cacheTimeKey = 'occupation_ids_cache_time';
+        
+        try {
+            localStorage.setItem(cacheKey, JSON.stringify(occupationIds));
+            localStorage.setItem(cacheTimeKey, Date.now().toString());
+        } catch (error) {
+            console.error("Error writing to cache:", error);
+            // Continue even if caching fails
+        }
+    }
+    
+    clearOccupationCache() {
+        localStorage.removeItem('occupation_ids_cache');
+        localStorage.removeItem('occupation_ids_cache_time');
     }
 }
