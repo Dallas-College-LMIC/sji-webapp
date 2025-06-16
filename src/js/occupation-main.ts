@@ -1,5 +1,5 @@
-import { OccupationMapController } from './occupation.js';
-import { AppInitializer } from './utils/appInitializer.js';
+import { OccupationMapController } from './occupation';
+import { AppInitializer } from './utils/appInitializer';
 import '../styles/shared.css';
 
 // Setup global error handlers

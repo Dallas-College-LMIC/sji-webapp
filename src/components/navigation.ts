@@ -1,6 +1,6 @@
-import { BRANDING } from '../js/constants.js';
+import { BRANDING } from '../js/constants';
 
-export function createNavigation(activePageTitle = '') {
+export function createNavigation(activePageTitle: string = ''): string {
     return `
         <nav class="navbar navbar-expand-lg navbar-dark g-0 p-0 m-0" id="banner">
             <a class="navbar-brand p-0" href="${BRANDING.homeUrl}">
@@ -31,7 +31,7 @@ export function createNavigation(activePageTitle = '') {
     `;
 }
 
-export function renderNavigation(containerId, activePageTitle = '') {
+export function renderNavigation(containerId: string, activePageTitle: string = ''): void {
     const container = document.getElementById(containerId);
     if (container) {
         container.innerHTML = createNavigation(activePageTitle);
