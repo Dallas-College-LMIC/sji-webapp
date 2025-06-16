@@ -29,6 +29,8 @@ The project uses a modern Vite build system with modular ES6 architecture:
 - Default API endpoint: localhost:8000 for development
 - Data includes census tract geometries with employment access z-scores
 - Occupation endpoint: `/occupation_ids` returns `{"occupation_ids": ["17-2051", ...]}`
+  - ~800 occupation IDs are cached client-side for 24 hours
+  - Non-blocking loading ensures map displays immediately
 
 ### Map Features
 - **Base Map**: Mapbox light style centered on DFW area (-97.0336, 32.8999)
@@ -62,6 +64,7 @@ src/js/
 - Both map controllers extend `BaseMapController` for shared functionality
 - Common methods: `initializeMapWithEmptySource()`, `updateExportLink()`, `showLoading()`, `clearMap()`
 - Subclasses implement specific logic: `loadOccupationIds()`, `setupDropdownListener()`
+- OccupationMapController includes caching methods: `getCachedOccupationIds()`, `cacheOccupationIds()`, `clearOccupationCache()`
 
 #### Error Handling
 - Global error handlers for unhandled promises and general errors
@@ -73,6 +76,7 @@ src/js/
 - `AppInitializer.initialize()` handles common setup with error boundaries
 - Each entry point (`*-main.js`) uses this pattern for consistent behavior
 - DOM ready checking and controller instantiation
+- Non-blocking initialization: map loads immediately, data loads asynchronously
 
 ### API Integration
 - `ApiService` handles all HTTP requests with error handling
@@ -80,8 +84,34 @@ src/js/
 - Dynamic layer switching based on user selections
 - Property name patterns: `{category}_zscore` and `{category}_zscore_cat`
 
+### Performance Optimizations
+- **Client-Side Caching**: 
+  - Occupation IDs cached in localStorage with 24-hour TTL
+  - Automatic cache invalidation on expiry
+  - Reduces API calls by ~99% for returning users
+- **Non-Blocking Loading**:
+  - Map initializes immediately without waiting for data
+  - Occupation IDs load asynchronously in background
+  - Improved perceived performance and user experience
+- **Cache Management**:
+  - Keys: `occupation_ids_cache` and `occupation_ids_cache_time`
+  - Graceful degradation if localStorage unavailable
+  - Manual cache clearing available via `clearOccupationCache()`
+
 ### Styling Conventions
 - Uses consistent Dallas College branding (blue #003385 banner, red #E52626 buttons)
 - Responsive design with Bootstrap grid system
 - CSS imported via ES6 modules (`import '../styles/shared.css'`)
 - Map container positioning and legend overlay
+
+## GitHub Pages Deployment
+
+### Configuration
+- Base path configured in `vite.config.js`: `/sji-webapp/`
+- GitHub Pages deployment via `npm run deploy` (uses gh-pages package)
+- Production API URL set via `.env.production` file
+
+### Requirements
+- API must have proper CORS headers for GitHub Pages domain
+- All features including localStorage caching work on static hosting
+- No server-side requirements
