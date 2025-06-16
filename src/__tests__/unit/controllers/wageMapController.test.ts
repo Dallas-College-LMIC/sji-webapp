@@ -1,11 +1,40 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { WageMapController } from '../../../js/wage';
-import { mockGeoJSONResponse } from '../../fixtures/apiResponses';
 import '../../mocks/mapbox-gl';
 import '../../mocks/jquery';
 
-// Mock dependencies
-vi.mock('../../../js/mapUtils');
+// Create the mock before the vi.mock call
+const mockMapManager = {
+  map: {
+    on: vi.fn(),
+    addSource: vi.fn(),
+    removeSource: vi.fn(),
+    getSource: vi.fn(),
+    addLayer: vi.fn(),
+    removeLayer: vi.fn(),
+    getLayer: vi.fn(() => null), // Return null by default (no layer exists)
+    setLayoutProperty: vi.fn(),
+    isStyleLoaded: vi.fn(() => true), // Add isStyleLoaded method
+  },
+  onStyleLoad: vi.fn((callback) => {
+    // Call the callback immediately to simulate style load
+    callback();
+  }),
+  addSource: vi.fn(),
+  addLayer: vi.fn(),
+  addPopupEvents: vi.fn(),
+  setLayerVisibility: vi.fn(),
+};
+
+// Mock the entire mapUtils module
+vi.mock('../../../js/mapUtils', () => {
+  return {
+    MapManager: vi.fn().mockImplementation(() => mockMapManager),
+  };
+});
+
+// Now import the actual modules
+import { WageMapController } from '../../../js/wage';
+import { mockGeoJSONResponse } from '../../fixtures/apiResponses';
 vi.mock('../../../js/api');
 vi.mock('../../../js/services/uiService', () => ({
   uiService: {
@@ -42,6 +71,8 @@ describe('WageMapController', () => {
   describe('constructor and initialization', () => {
     it('should initialize with correct default values', () => {
       controller = new WageMapController('test-container');
+      // Manually replace the mapManager with our mock
+      controller['mapManager'] = mockMapManager;
       
       expect(controller['containerId']).toBe('test-container');
       expect(controller['sourceId']).toBe('tti_data');
@@ -50,6 +81,8 @@ describe('WageMapController', () => {
 
     it('should initialize with correct layer configuration', () => {
       controller = new WageMapController('test-container');
+      // Manually replace the mapManager with our mock
+      controller['mapManager'] = mockMapManager;
       
       const layers = controller['layers'];
       
@@ -85,6 +118,8 @@ describe('WageMapController', () => {
   describe('initialize', () => {
     it('should initialize map and load data', async () => {
       controller = new WageMapController('test-container');
+      // Manually replace the mapManager with our mock
+      controller['mapManager'] = mockMapManager;
       
       // Mock the methods that should be called
       const initializeMapSpy = vi.spyOn(controller, 'initializeMapWithEmptySource').mockResolvedValue();
@@ -100,6 +135,8 @@ describe('WageMapController', () => {
 
     it('should setup layers and dropdown after loading data', async () => {
       controller = new WageMapController('test-container');
+      // Manually replace the mapManager with our mock
+      controller['mapManager'] = mockMapManager;
       
       // Mock methods
       vi.spyOn(controller, 'initializeMapWithEmptySource').mockResolvedValue();
@@ -123,6 +160,8 @@ describe('WageMapController', () => {
   describe('setupDropdownListener', () => {
     it('should setup dropdown change handler', () => {
       controller = new WageMapController('test-container');
+      // Manually replace the mapManager with our mock
+      controller['mapManager'] = mockMapManager;
       
       const setupDropdownChangeHandlerSpy = vi.spyOn(controller, 'setupDropdownChangeHandler').mockImplementation(() => {});
       
@@ -133,12 +172,8 @@ describe('WageMapController', () => {
 
     it('should handle layer visibility changes', () => {
       controller = new WageMapController('test-container');
-      
-      // Mock mapManager
-      const mockMapManager = {
-        setLayerVisibility: vi.fn(),
-      };
-      controller['mapManager'] = mockMapManager as any;
+      // Manually replace the mapManager with our mock
+      controller['mapManager'] = mockMapManager;
       
       const updateExportLinkSpy = vi.spyOn(controller, 'updateExportLink').mockImplementation(() => {});
       
@@ -160,12 +195,8 @@ describe('WageMapController', () => {
 
     it('should handle switching to different layers', () => {
       controller = new WageMapController('test-container');
-      
-      // Mock mapManager
-      const mockMapManager = {
-        setLayerVisibility: vi.fn(),
-      };
-      controller['mapManager'] = mockMapManager as any;
+      // Manually replace the mapManager with our mock
+      controller['mapManager'] = mockMapManager;
       
       vi.spyOn(controller, 'updateExportLink').mockImplementation(() => {});
       
@@ -188,6 +219,8 @@ describe('WageMapController', () => {
   describe('getLayerIds', () => {
     it('should return correct layer IDs', () => {
       controller = new WageMapController('test-container');
+      // Manually replace the mapManager with our mock
+      controller['mapManager'] = mockMapManager;
       
       const layerIds = controller['getLayerIds']();
       
@@ -196,6 +229,8 @@ describe('WageMapController', () => {
 
     it('should return layer IDs in correct order', () => {
       controller = new WageMapController('test-container');
+      // Manually replace the mapManager with our mock
+      controller['mapManager'] = mockMapManager;
       
       const layerIds = controller['getLayerIds']();
       
@@ -208,6 +243,8 @@ describe('WageMapController', () => {
   describe('layer configuration', () => {
     it('should have layer with correct property mappings', () => {
       controller = new WageMapController('test-container');
+      // Manually replace the mapManager with our mock
+      controller['mapManager'] = mockMapManager;
       
       const layers = controller['layers'];
       

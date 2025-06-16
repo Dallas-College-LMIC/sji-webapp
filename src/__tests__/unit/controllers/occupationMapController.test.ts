@@ -1,11 +1,8 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { OccupationMapController } from '../../../js/occupation';
-import { createMockLocalStorage } from '../../utils/testHelpers';
-import { mockOccupationIdsResponse, mockGeoJSONResponse } from '../../fixtures/apiResponses';
 import '../../mocks/mapbox-gl';
 import '../../mocks/jquery';
 
-// Mock dependencies
+// Create the mock before the vi.mock call
 const mockMapManager = {
   map: {
     on: vi.fn(),
@@ -16,6 +13,7 @@ const mockMapManager = {
     removeLayer: vi.fn(),
     getLayer: vi.fn(() => null), // Return null by default (no layer exists)
     setLayoutProperty: vi.fn(),
+    isStyleLoaded: vi.fn(() => true), // Add isStyleLoaded method
   },
   onStyleLoad: vi.fn((callback) => {
     // Call the callback immediately to simulate style load
@@ -24,11 +22,20 @@ const mockMapManager = {
   addSource: vi.fn(),
   addLayer: vi.fn(),
   addPopupEvents: vi.fn(),
+  setLayerVisibility: vi.fn(),
 };
 
-vi.mock('../../../js/mapUtils', () => ({
-  MapManager: vi.fn().mockImplementation(() => mockMapManager),
-}));
+// Mock the entire mapUtils module
+vi.mock('../../../js/mapUtils', () => {
+  return {
+    MapManager: vi.fn().mockImplementation(() => mockMapManager),
+  };
+});
+
+// Now import the actual modules
+import { OccupationMapController } from '../../../js/occupation';
+import { createMockLocalStorage } from '../../utils/testHelpers';
+import { mockOccupationIdsResponse, mockGeoJSONResponse } from '../../fixtures/apiResponses';
 vi.mock('../../../js/api');
 vi.mock('../../../js/services/uiService', () => ({
   uiService: {
@@ -111,6 +118,8 @@ describe('OccupationMapController', () => {
   describe('constructor and initialization', () => {
     it('should initialize with default values', () => {
       controller = new OccupationMapController('test-container');
+      // Manually replace the mapManager with our mock
+      controller['mapManager'] = mockMapManager;
       
       expect(controller['containerId']).toBe('test-container');
       expect(controller['sourceId']).toBe('occupation_data');
@@ -137,6 +146,8 @@ describe('OccupationMapController', () => {
       });
       
       controller = new OccupationMapController('test-container');
+      // Manually replace the mapManager with our mock
+      controller['mapManager'] = mockMapManager;
       
       // Check that old cache was removed (migration cleans up old format)
       expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('occupation_ids_cache');
@@ -147,6 +158,8 @@ describe('OccupationMapController', () => {
   describe('loadOccupationIds', () => {
     beforeEach(async () => {
       controller = new OccupationMapController('test-container');
+      // Manually replace the mapManager with our mock
+      controller['mapManager'] = mockMapManager;
       // Wait for initialization to complete
       await new Promise(resolve => setTimeout(resolve, 0));
     });
@@ -215,6 +228,8 @@ describe('OccupationMapController', () => {
   describe('populateOccupationDropdown', () => {
     beforeEach(() => {
       controller = new OccupationMapController('test-container');
+      // Manually replace the mapManager with our mock
+      controller['mapManager'] = mockMapManager;
     });
 
     it('should populate dropdown with occupation IDs', () => {
@@ -247,6 +262,8 @@ describe('OccupationMapController', () => {
   describe('loadOccupationData', () => {
     beforeEach(async () => {
       controller = new OccupationMapController('test-container');
+      // Manually replace the mapManager with our mock
+      controller['mapManager'] = mockMapManager;
       // Wait for initialization to complete
       await new Promise(resolve => setTimeout(resolve, 10));
     });
@@ -297,6 +314,8 @@ describe('OccupationMapController', () => {
   describe('clearOccupationCache', () => {
     beforeEach(() => {
       controller = new OccupationMapController('test-container');
+      // Manually replace the mapManager with our mock
+      controller['mapManager'] = mockMapManager;
     });
 
     it('should clear occupation cache', () => {

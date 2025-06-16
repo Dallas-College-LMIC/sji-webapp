@@ -1,12 +1,38 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { BaseMapController, DataLoadConfig } from '../../../js/controllers/baseMapController';
-import { MapManager } from '../../../js/mapUtils';
-import { ApiService } from '../../../js/api';
-import { mockGeoJSONResponse } from '../../fixtures/apiResponses';
 import '../../mocks/mapbox-gl';
 
-// Mock the imports
-vi.mock('../../../js/mapUtils');
+// Create the mock before the vi.mock call
+const mockMapManager = {
+  map: {
+    on: vi.fn(),
+    isStyleLoaded: vi.fn(() => true),
+    getLayer: vi.fn(() => null),
+    removeLayer: vi.fn(),
+    addSource: vi.fn(),
+    setLayoutProperty: vi.fn(),
+  },
+  addSource: vi.fn(),
+  addLayer: vi.fn(),
+  clearLayers: vi.fn(),
+  onStyleLoad: vi.fn((callback) => {
+    // Call the callback immediately to simulate style load
+    callback();
+  }),
+  addPopupEvents: vi.fn(),
+  setLayerVisibility: vi.fn(),
+};
+
+// Mock the entire mapUtils module
+vi.mock('../../../js/mapUtils', () => {
+  return {
+    MapManager: vi.fn().mockImplementation(() => mockMapManager),
+  };
+});
+
+// Now import the actual modules
+import { BaseMapController, DataLoadConfig } from '../../../js/controllers/baseMapController';
+import { ApiService } from '../../../js/api';
+import { mockGeoJSONResponse } from '../../fixtures/apiResponses';
 vi.mock('../../../js/api');
 vi.mock('../../../js/services/uiService', () => ({
   uiService: {
@@ -31,27 +57,12 @@ class TestMapController extends BaseMapController {
 
 describe('BaseMapController', () => {
   let controller: TestMapController;
-  let mockMapManager: MapManager;
   let mockApiService: ApiService;
 
   beforeEach(() => {
     vi.clearAllMocks();
     
-    // Setup mocks
-    mockMapManager = {
-      map: {
-        on: vi.fn(),
-        isStyleLoaded: vi.fn(),
-        getLayer: vi.fn(),
-        removeLayer: vi.fn(),
-      },
-      addSource: vi.fn(),
-      addLayer: vi.fn(),
-      clearLayers: vi.fn(),
-      onStyleLoad: vi.fn(),
-      addPopupEvents: vi.fn(),
-    } as any;
-    
+    // Setup API service mock
     mockApiService = {
       getGeojsonData: vi.fn(),
       getExportUrl: vi.fn(),
@@ -60,8 +71,10 @@ describe('BaseMapController', () => {
     // Create controller
     controller = new TestMapController('test-container', 'test-source');
     
-    // Replace with mocks
+    // Manually replace the mapManager with our mock
     controller['mapManager'] = mockMapManager;
+    
+    // Replace API service with mock
     controller['apiService'] = mockApiService;
   });
 
