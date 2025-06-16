@@ -17,7 +17,7 @@ describe('ApiService', () => {
 
   describe('constructor', () => {
     it('should use default base URL when env variable is not set', () => {
-      // The actual default in the code is localhost:8000, but .env has 127.0.0.1:8000
+      // In test environment, .env file sets this to 127.0.0.1:8000
       expect(apiService['baseUrl']).toBe('http://127.0.0.1:8000');
     });
 

@@ -1,0 +1,133 @@
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  src/__tests__/unit/api.test.ts > ApiService > constructor > should use default base URL when env variable is not set
+AssertionError: expected 'http://localhost:8000' to be 'http://127.0.0.1:8000' // Object.is equality
+Expected: "http://127.0.0.1:8000"
+Received: "http://localhost:8000"
+ ❯ src/__tests__/unit/api.test.ts:21:37
+     19|     it('should use default base URL when env variable is not set', () …
+     20|       // The actual default in the code is localhost:8000, but .env ha…
+     21|       expect(apiService['baseUrl']).toBe('http://127.0.0.1:8000');
+       |                                     ^
+     22|     });
+     23| 
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+ FAIL  src/__tests__/unit/api.test.ts > ApiService > getOccupationIds > should fetch occupation IDs successfully
+AssertionError: expected "spy" to be called with arguments: [ …(2) ]
+Received: 
+  1st spy call:
+  [
+-   "http://127.0.0.1:8000/occupation_ids",
+-   ObjectContaining {
+-     "headers": ObjectContaining {
++   "http://localhost:8000/occupation_ids",
++   {
++     "headers": {
+        "Content-Type": "application/json",
+      },
+      "method": "GET",
+-     "signal": Any<AbortSignal>,
++     "signal": AbortSignal {
++       "onabort": null,
++       Symbol(listeners): {
++         "bubbling": Map {},
++         "capturing": Map {},
++       },
++       Symbol(listenerOptions): {
++         "bubbling": Map {},
++         "capturing": Map {},
++       },
++       Symbol(aborted): false,
++       Symbol(reason): undefined,
++     },
+    },
+  ]
+
+Number of calls: 1
+
+ ❯ src/__tests__/unit/api.test.ts:38:21
+     36|       const result = await apiService.getOccupationIds();
+     37| 
+     38|       expect(fetch).toHaveBeenCalledWith(
+       |                     ^
+     39|         'http://127.0.0.1:8000/occupation_ids',
+     40|         expect.objectContaining({
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+ FAIL  src/__tests__/unit/api.test.ts > ApiService > getGeojsonData > should fetch geojson data with params
+AssertionError: expected "spy" to be called with arguments: [ …(2) ]
+Received: 
+  1st spy call:
+  [
+-   "http://127.0.0.1:8000/geojson?occupation_id=11-1011",
+-   Any<Object>,
++   "http://localhost:8000/geojson?occupation_id=11-1011",
++   {
++     "headers": {
++       "Content-Type": "application/json",
++     },
++     "method": "GET",
++     "signal": AbortSignal {
++       "onabort": null,
++       Symbol(listeners): {
++         "bubbling": Map {},
++         "capturing": Map {},
++       },
++       Symbol(listenerOptions): {
++         "bubbling": Map {},
++         "capturing": Map {},
++       },
++       Symbol(aborted): false,
++       Symbol(reason): undefined,
++     },
++   },
+  ]
+
+Number of calls: 1
+
+ ❯ src/__tests__/unit/api.test.ts:110:21
+    108|       const result = await apiService.getGeojsonData(params);
+    109| 
+    110|       expect(fetch).toHaveBeenCalledWith(
+       |                     ^
+    111|         'http://127.0.0.1:8000/geojson?occupation_id=11-1011',
+    112|         expect.any(Object)
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+ FAIL  src/__tests__/unit/api.test.ts > ApiService > getGeojsonData > should fetch geojson data without params
+AssertionError: expected "spy" to be called with arguments: [ …(2) ]
+Received: 
+  1st spy call:
+  [
+-   "http://127.0.0.1:8000/geojson",
+-   Any<Object>,
++   "http://localhost:8000/geojson",
++   {
++     "headers": {
++       "Content-Type": "application/json",
++     },
++     "method": "GET",
++     "signal": AbortSignal {
++       "onabort": null,
++       Symbol(listeners): {
++         "bubbling": Map {},
++         "capturing": Map {},
++       },
++       Symbol(listenerOptions): {
++         "bubbling": Map {},
++         "capturing": Map {},
++       },
++       Symbol(aborted): false,
++       Symbol(reason): undefined,
++     },
++   },
+  ]
+
+Number of calls: 1
+
+ ❯ src/__tests__/unit/api.test.ts:123:21
+    121|       const result = await apiService.getGeojsonData();
+    122| 
+    123|       expect(fetch).toHaveBeenCalledWith(
+       |                     ^
+    124|         'http://127.0.0.1:8000/geojson',
+    125|         expect.any(Object)
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+⎯⎯⎯⎯⎯⎯ Unhandled Errors ⎯⎯⎯⎯⎯⎯

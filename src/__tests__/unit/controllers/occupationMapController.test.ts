@@ -2,8 +2,9 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import '../../mocks/mapbox-gl';
 import '../../mocks/jquery';
 
-// Create the mock before the vi.mock call
-const mockMapManager = {
+// Use vi.hoisted to ensure mock is created before imports
+const { mockMapManager } = vi.hoisted(() => {
+  const mockMapManager = {
   map: {
     on: vi.fn(),
     addSource: vi.fn(),
@@ -17,13 +18,16 @@ const mockMapManager = {
   },
   onStyleLoad: vi.fn((callback) => {
     // Call the callback immediately to simulate style load
-    callback();
+    // Use setTimeout to ensure it's async
+    setTimeout(() => callback(), 0);
   }),
   addSource: vi.fn(),
   addLayer: vi.fn(),
   addPopupEvents: vi.fn(),
   setLayerVisibility: vi.fn(),
 };
+  return { mockMapManager };
+});
 
 // Mock the entire mapUtils module
 vi.mock('../../../js/mapUtils', () => {
@@ -116,17 +120,18 @@ describe('OccupationMapController', () => {
   });
 
   describe('constructor and initialization', () => {
-    it('should initialize with default values', () => {
+    it('should initialize with default values', async () => {
       controller = new OccupationMapController('test-container');
-      // Manually replace the mapManager with our mock
-      controller['mapManager'] = mockMapManager;
+      
+      // Wait for async initialization
+      await new Promise(resolve => setTimeout(resolve, 0));
       
       expect(controller['containerId']).toBe('test-container');
       expect(controller['sourceId']).toBe('occupation_data');
       expect(controller['currentOccupationId']).toBeNull();
     });
 
-    it('should migrate old cache on initialization', () => {
+    it('should migrate old cache on initialization', async () => {
       // Set old cache format with valid (non-expired) data
       const oldData = ['11-1011', '11-1021'];
       const currentTime = Date.now();
@@ -146,8 +151,9 @@ describe('OccupationMapController', () => {
       });
       
       controller = new OccupationMapController('test-container');
-      // Manually replace the mapManager with our mock
-      controller['mapManager'] = mockMapManager;
+      
+      // Wait for async initialization
+      await new Promise(resolve => setTimeout(resolve, 0));
       
       // Check that old cache was removed (migration cleans up old format)
       expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('occupation_ids_cache');
@@ -158,8 +164,6 @@ describe('OccupationMapController', () => {
   describe('loadOccupationIds', () => {
     beforeEach(async () => {
       controller = new OccupationMapController('test-container');
-      // Manually replace the mapManager with our mock
-      controller['mapManager'] = mockMapManager;
       // Wait for initialization to complete
       await new Promise(resolve => setTimeout(resolve, 0));
     });
@@ -228,8 +232,6 @@ describe('OccupationMapController', () => {
   describe('populateOccupationDropdown', () => {
     beforeEach(() => {
       controller = new OccupationMapController('test-container');
-      // Manually replace the mapManager with our mock
-      controller['mapManager'] = mockMapManager;
     });
 
     it('should populate dropdown with occupation IDs', () => {
@@ -262,8 +264,6 @@ describe('OccupationMapController', () => {
   describe('loadOccupationData', () => {
     beforeEach(async () => {
       controller = new OccupationMapController('test-container');
-      // Manually replace the mapManager with our mock
-      controller['mapManager'] = mockMapManager;
       // Wait for initialization to complete
       await new Promise(resolve => setTimeout(resolve, 10));
     });
@@ -314,8 +314,6 @@ describe('OccupationMapController', () => {
   describe('clearOccupationCache', () => {
     beforeEach(() => {
       controller = new OccupationMapController('test-container');
-      // Manually replace the mapManager with our mock
-      controller['mapManager'] = mockMapManager;
     });
 
     it('should clear occupation cache', () => {

@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import '../../mocks/mapbox-gl';
 
-// Create the mock before the vi.mock call
-const mockMapManager = {
+// Use vi.hoisted to ensure mock is created before imports
+const { mockMapManager } = vi.hoisted(() => {
+  const mockMapManager = {
   map: {
     on: vi.fn(),
     isStyleLoaded: vi.fn(() => true),
@@ -21,6 +22,8 @@ const mockMapManager = {
   addPopupEvents: vi.fn(),
   setLayerVisibility: vi.fn(),
 };
+  return { mockMapManager };
+});
 
 // Mock the entire mapUtils module
 vi.mock('../../../js/mapUtils', () => {
