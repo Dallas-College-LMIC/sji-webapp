@@ -34,7 +34,7 @@
     
     /* Advanced Options */
     "skipLibCheck": true,
-    "types": ["vite/client", "node"]
+    "types": ["vite/client", "node", "vitest/globals"]
   },
   "include": [
     "src/**/*",
@@ -42,7 +42,10 @@
     "src/**/*.tsx",
     "src/**/*.js",
     "src/**/*.jsx",
+    "src/**/*.test.ts",
+    "src/**/*.spec.ts",
     "vite.config.ts",
+    "vitest.config.ts",
     "scripts/**/*.ts"
   ],
   "exclude": [

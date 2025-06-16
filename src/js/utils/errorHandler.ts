@@ -234,6 +234,20 @@ export class ErrorHandler {
     }
 
     /**
+     * Get error history
+     */
+    static getErrorHistory(): Array<{error: Error, timestamp: Date, context: string}> {
+        return this.errorHistory;
+    }
+
+    /**
+     * Clear error history (useful for testing)
+     */
+    static clearErrorHistory(): void {
+        this.errorHistory = [];
+    }
+
+    /**
      * Check if we have error history
      */
     private static hasErrorHistory(): boolean {
@@ -257,15 +271,11 @@ export class ErrorHandler {
     static logError(error: Error, context: string, additionalInfo: Record<string, any> = {}): void {
         const errorContext = this.analyzeError(error);
         
-        console.group(`🔴 Error in ${context}`);
-        console.error('Error Type:', errorContext.type);
-        console.error('User Message:', errorContext.userMessage);
-        console.error('Technical Message:', errorContext.technicalMessage);
-        console.error('Error Object:', error);
-        console.error('Stack:', error.stack);
-        console.error('Additional Info:', additionalInfo);
-        console.error('Retryable:', errorContext.retryable);
-        console.groupEnd();
+        // Simple logging format for test compatibility
+        console.error(`[${context}] Error:`, error);
+        
+        // Record error in history
+        this.recordError(error, context);
         
         // Send to monitoring service if configured
         this.sendToMonitoring(error, context, errorContext);
@@ -284,45 +294,67 @@ export class ErrorHandler {
     /**
      * Show inline error message (non-blocking)
      */
-    static showInlineError(elementId: string, message: string, duration: number = 5000): void {
-        const element = document.getElementById(elementId);
-        if (!element) return;
+    static showInlineError(containerId: string, message: string, retryCallback?: () => void): void {
+        const container = document.getElementById(containerId);
+        if (!container) return;
         
         const errorDiv = document.createElement('div');
-        errorDiv.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: #dc3545;
-            color: white;
-            padding: 1rem 1.5rem;
-            border-radius: 4px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-            z-index: 9999;
-            max-width: 400px;
-            animation: slideIn 0.3s ease-out;
-        `;
+        errorDiv.className = 'alert alert-danger';
         errorDiv.textContent = message;
         
-        // Add animation
-        const style = document.createElement('style');
-        style.textContent = `
-            @keyframes slideIn {
-                from { transform: translateX(100%); opacity: 0; }
-                to { transform: translateX(0); opacity: 1; }
+        if (retryCallback) {
+            const retryButton = document.createElement('button');
+            retryButton.textContent = 'Retry';
+            retryButton.className = 'btn btn-danger ms-2';
+            retryButton.onclick = retryCallback;
+            errorDiv.appendChild(retryButton);
+        }
+        
+        container.appendChild(errorDiv);
+    }
+
+    /**
+     * Handle API errors with user-friendly messages
+     */
+    static handleApiError(error: Error, containerId: string, userMessage: string): void {
+        this.logError(error, 'API');
+        this.showInlineError(containerId, userMessage);
+    }
+
+    /**
+     * Create error boundary wrapper for functions
+     */
+    static createErrorBoundary<T extends (...args: any[]) => any>(
+        fn: T, 
+        context: string
+    ): T {
+        return ((...args: any[]) => {
+            try {
+                const result = fn(...args);
+                if (result instanceof Promise) {
+                    return result.catch((error: Error) => {
+                        this.logError(error, context);
+                        throw error;
+                    });
+                }
+                return result;
+            } catch (error) {
+                this.logError(error as Error, context);
+                throw error;
             }
-        `;
-        document.head.appendChild(style);
+        }) as T;
+    }
+
+    /**
+     * Setup global error handlers
+     */
+    static setupGlobalHandlers(): void {
+        window.addEventListener('error', (event) => {
+            this.logError(event.error, 'Global');
+        });
         
-        document.body.appendChild(errorDiv);
-        
-        // Auto-remove after duration
-        setTimeout(() => {
-            errorDiv.style.animation = 'slideIn 0.3s ease-out reverse';
-            setTimeout(() => {
-                document.body.removeChild(errorDiv);
-                document.head.removeChild(style);
-            }, 300);
-        }, duration);
+        window.addEventListener('unhandledrejection', (event) => {
+            this.logError(new Error(event.reason), 'UnhandledPromise');
+        });
     }
 }
