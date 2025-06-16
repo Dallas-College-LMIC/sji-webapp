@@ -5,10 +5,6 @@ import { MapManager } from '../../../js/mapUtils';
  * Testable version of WageMapController that exposes protected methods for testing
  */
 export class TestableWageMapController extends WageMapController {
-    private _initializeMapWithEmptySourceCalled = false;
-    private _loadDataCalled = false;
-    private _loadDataConfig: any;
-
     constructor(containerId: string, mapManager?: MapManager) {
         super(containerId);
         // Replace the MapManager if provided
