@@ -159,10 +159,10 @@ describe('WageMapController', () => {
       const realController = new WageMapController('test-container');
       
       // Mock the protected methods on the prototype
-      const initializeMapSpy = vi.spyOn(WageMapController.prototype as any, 'initializeMapWithEmptySource').mockResolvedValue();
-      const loadDataSpy = vi.spyOn(WageMapController.prototype as any, 'loadData').mockResolvedValue(null);
-      const addLayersFromConfigSpy = vi.spyOn(WageMapController.prototype as any, 'addLayersFromConfig').mockImplementation(() => {});
-      const setupDropdownListenerSpy = vi.spyOn(WageMapController.prototype as any, 'setupDropdownListener').mockImplementation(() => {});
+      const initializeMapSpy = vi.spyOn(WageMapController.prototype as any, 'initializeMapWithEmptySource').mockImplementation(async () => {});
+      const loadDataSpy = vi.spyOn(WageMapController.prototype as any, 'loadData').mockImplementation(async () => null);
+      vi.spyOn(WageMapController.prototype as any, 'addLayersFromConfig').mockImplementation(() => {});
+      vi.spyOn(WageMapController.prototype as any, 'setupDropdownListener').mockImplementation(() => {});
       
       await realController.initialize();
       

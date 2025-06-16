@@ -329,10 +329,10 @@ describe('uiService', () => {
       uiService.addDropdownOptions('test-dropdown', options);
 
       expect(select.children.length).toBe(2);
-      expect(select.children[0].getAttribute('value')).toBe('val1');
-      expect(select.children[0].textContent).toBe('Option 1');
-      expect(select.children[1].getAttribute('value')).toBe('val2');
-      expect(select.children[1].textContent).toBe('Option 2');
+      expect(select.children[0]?.getAttribute('value')).toBe('val1');
+      expect(select.children[0]?.textContent).toBe('Option 1');
+      expect(select.children[1]?.getAttribute('value')).toBe('val2');
+      expect(select.children[1]?.textContent).toBe('Option 2');
     });
 
     it('should handle missing element', () => {
