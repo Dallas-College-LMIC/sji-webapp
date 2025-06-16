@@ -8,7 +8,7 @@ export class ErrorHandler {
      * @param {Error} error - The error that occurred
      * @param {string} context - Context where the error occurred
      */
-    static showErrorMessage(containerId, error, context = 'application') {
+    static showErrorMessage(containerId: string, error: Error, context: string = 'application'): void {
         const container = document.getElementById(containerId);
         if (!container) {
             console.error('Error container not found:', containerId);
@@ -44,7 +44,7 @@ export class ErrorHandler {
     /**
      * Get appropriate error title based on error type and context
      */
-    static getErrorTitle(error, context) {
+    static getErrorTitle(error: Error, context: string): string {
         if (error.message?.includes('fetch') || error.name === 'TypeError') {
             return 'API Connection Error';
         }
@@ -57,7 +57,7 @@ export class ErrorHandler {
     /**
      * Get user-friendly error message
      */
-    static getErrorMessage(error, context) {
+    static getErrorMessage(error: Error, context: string): string {
         if (error.message?.includes('fetch') || error.name === 'TypeError') {
             return 'Unable to connect to the data API. This application requires a backend API server to provide GeoJSON data.';
         }
@@ -70,7 +70,7 @@ export class ErrorHandler {
     /**
      * Log error with context for debugging
      */
-    static logError(error, context, additionalInfo = {}) {
+    static logError(error: Error, context: string, additionalInfo: Record<string, any> = {}): void {
         console.group(`🔴 Error in ${context}`);
         console.error('Error:', error);
         console.error('Stack:', error.stack);

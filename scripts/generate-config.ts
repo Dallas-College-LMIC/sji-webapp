@@ -1,5 +1,7 @@
-require('dotenv').config();
-const fs = require('fs');
+import dotenv from 'dotenv';
+import fs from 'fs';
+
+dotenv.config();
 
 const config = `window.CONFIG = {
   API_BASE_URL: '${process.env.API_BASE_URL}',

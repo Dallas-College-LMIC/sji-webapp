@@ -1,15 +1,22 @@
 {
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "tsc && vite build",
     "preview": "vite preview",
-    "deploy": "vite build && gh-pages -d dist"
+    "deploy": "npm run build && gh-pages -d dist",
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "dotenv": "^16.5.0"
   },
   "devDependencies": {
+    "@types/bootstrap": "^5.2.10",
+    "@types/jquery": "^3.5.32",
+    "@types/mapbox-gl": "^1.13.6",
+    "@types/node": "^24.0.3",
+    "@types/select2": "^4.0.63",
     "gh-pages": "^6.3.0",
+    "typescript": "^5.8.3",
     "vite": "^6.3.5"
   }
 }

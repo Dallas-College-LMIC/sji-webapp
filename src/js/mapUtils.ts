@@ -1,21 +1,27 @@
-import { MAP_CONFIG, COLOR_SCHEMES } from './constants.js';
+import { MAP_CONFIG, COLOR_SCHEMES } from './constants';
+import type { GeoJSONResponse } from '../types/api';
 
 export class MapManager {
-    constructor(containerId) {
-        this.map = null;
+    public map!: any; // mapboxgl.Map
+    private containerId: string;
+    private popup!: any; // mapboxgl.Popup
+
+    constructor(containerId: string) {
         this.containerId = containerId;
-        this.popup = null;
         this.initializeMap();
     }
 
-    initializeMap() {
+    private initializeMap(): void {
+        // @ts-ignore - mapboxgl is loaded from CDN
         mapboxgl.accessToken = MAP_CONFIG.accessToken;
         
+        // @ts-ignore - mapboxgl is loaded from CDN
         this.map = new mapboxgl.Map({
             container: this.containerId,
             ...MAP_CONFIG
         });
 
+        // @ts-ignore - mapboxgl is loaded from CDN
         this.popup = new mapboxgl.Popup({
             closeButton: true,
             closeOnClick: false,
@@ -27,15 +33,17 @@ export class MapManager {
         this.addControls();
     }
 
-    addControls() {
+    private addControls(): void {
         this.map.addControl(
+            // @ts-ignore - mapboxgl is loaded from CDN
             new mapboxgl.FullscreenControl({
-                container: document.querySelector("body")
+                container: document.querySelector("body") as HTMLElement
             }),
             "bottom-left"
         );
 
         this.map.addControl(
+            // @ts-ignore - mapboxgl is loaded from CDN
             new mapboxgl.NavigationControl({
                 showCompass: true,
                 showZoom: true,
@@ -45,19 +53,19 @@ export class MapManager {
         );
     }
 
-    addSource(sourceId, data) {
+    addSource(sourceId: string, data: GeoJSONResponse | { type: string; features: any[] }): void {
         if (this.map.getSource(sourceId)) {
-            this.map.getSource(sourceId).setData(data);
+            (this.map.getSource(sourceId) as any).setData(data as any);
         } else {
             this.map.addSource(sourceId, {
                 type: "geojson",
-                data: data
+                data: data as any
             });
         }
     }
 
-    createLayerColor(propertyName) {
-        const layerColor = ["match", ["get", propertyName]];
+    private createLayerColor(propertyName: string): any[] {
+        const layerColor: any[] = ["match", ["get", propertyName]];
         
         COLOR_SCHEMES.zscoreCategories.forEach((category, index) => {
             layerColor.push(category, COLOR_SCHEMES.zscoreColors[index]);
@@ -67,7 +75,7 @@ export class MapManager {
         return layerColor;
     }
 
-    addLayer(layerId, sourceId, propertyName, visibility = 'visible') {
+    addLayer(layerId: string, sourceId: string, propertyName: string, visibility: 'visible' | 'none' = 'visible'): void {
         if (this.map.getLayer(layerId)) {
             this.map.removeLayer(layerId);
         }
@@ -80,20 +88,20 @@ export class MapManager {
                 visibility: visibility
             },
             paint: {
-                'fill-color': this.createLayerColor(propertyName),
+                'fill-color': this.createLayerColor(propertyName) as any,
                 'fill-outline-color': COLOR_SCHEMES.outlineColor
             }
         });
     }
 
-    setLayerVisibility(layerId, visibility) {
+    setLayerVisibility(layerId: string, visibility: 'visible' | 'none'): void {
         if (this.map.getLayer(layerId)) {
             this.map.setLayoutProperty(layerId, 'visibility', visibility);
         }
     }
 
-    addPopupEvents(layerId, title, scoreProperty) {
-        this.map.on('click', layerId, (e) => {
+    addPopupEvents(layerId: string, title: string, scoreProperty: string): void {
+        this.map.on('click', layerId, (e: any) => {
             const coordinates = e.lngLat;
             const properties = e.features[0].properties;
             const score = properties[scoreProperty];
@@ -118,7 +126,7 @@ export class MapManager {
         });
     }
 
-    onStyleLoad(callback) {
+    onStyleLoad(callback: () => void): void {
         this.map.on('style.load', callback);
     }
 }

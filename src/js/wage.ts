@@ -1,7 +1,10 @@
-import { BaseMapController } from './controllers/baseMapController.js';
+import { BaseMapController } from './controllers/baseMapController';
+import type { LayerConfig } from '../types/api';
 
 export class WageMapController extends BaseMapController {
-    constructor(containerId) {
+    private layers: LayerConfig[];
+
+    constructor(containerId: string) {
         super(containerId, 'tti_data');
         this.layers = [
             { id: "pop", visibility: "visible", property: "all_jobs_zscore_cat", title: "Access to All Jobs", scoreProperty: "all_jobs_zscore" },
@@ -11,7 +14,7 @@ export class WageMapController extends BaseMapController {
         this.initialize();
     }
 
-    async initialize() {
+    async initialize(): Promise<void> {
         await this.initializeMapWithEmptySource();
         
         try {
@@ -39,8 +42,8 @@ export class WageMapController extends BaseMapController {
         }
     }
 
-    setupDropdownListener() {
-        const tti = document.getElementById("tti");
+    private setupDropdownListener(): void {
+        const tti = document.getElementById("tti") as HTMLSelectElement | null;
         
         if (!tti) {
             console.warn('Dropdown element with id "tti" not found');
@@ -58,7 +61,7 @@ export class WageMapController extends BaseMapController {
         });
     }
 
-    getLayerIds() {
+    protected getLayerIds(): string[] {
         return this.layers.map(layer => layer.id);
     }
 }

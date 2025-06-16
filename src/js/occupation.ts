@@ -1,14 +1,15 @@
-import { BaseMapController } from './controllers/baseMapController.js';
+import { BaseMapController } from './controllers/baseMapController';
 
 export class OccupationMapController extends BaseMapController {
-    constructor(containerId) {
+    private currentOccupationId: string | null;
+
+    constructor(containerId: string) {
         super(containerId, 'occupation_data');
         this.currentOccupationId = null;
-        this.geojsonData = null;
         this.initialize();
     }
 
-    async initialize() {
+    async initialize(): Promise<void> {
         // Initialize map immediately without waiting for occupation IDs
         await this.initializeMapWithEmptySource();
         
@@ -18,7 +19,7 @@ export class OccupationMapController extends BaseMapController {
         });
     }
 
-    async loadOccupationIds() {
+    private async loadOccupationIds(): Promise<void> {
         this.showLoading('loading');
         
         try {
@@ -36,7 +37,7 @@ export class OccupationMapController extends BaseMapController {
             console.log("Loaded occupation IDs response:", response);
             
             // Handle new API structure - extract occupation_ids array from response
-            const occupationIds = response.occupation_ids || response;
+            const occupationIds = response.occupation_ids || (response as any);
             
             // Cache the data
             this.cacheOccupationIds(occupationIds);
@@ -50,8 +51,8 @@ export class OccupationMapController extends BaseMapController {
         }
     }
     
-    populateOccupationDropdown(occupationIds) {
-        const select = $('#occupation-select');
+    private populateOccupationDropdown(occupationIds: string[]): void {
+        const select = $('#occupation-select') as JQuery<HTMLSelectElement>;
         
         // Clear existing options except the first one
         select.find('option:not(:first)').remove();
@@ -70,7 +71,7 @@ export class OccupationMapController extends BaseMapController {
         
         // Set up change event listener
         select.on('change', (e) => {
-            const selectedOccupation = $(e.target).val();
+            const selectedOccupation = $(e.target).val() as string;
             if (selectedOccupation) {
                 this.loadOccupationData(selectedOccupation);
             } else {
@@ -79,13 +80,12 @@ export class OccupationMapController extends BaseMapController {
         });
     }
     
-    async loadOccupationData(occupationId) {
+    private async loadOccupationData(occupationId: string): Promise<void> {
         this.currentOccupationId = occupationId;
         
         try {
             const data = await this.apiService.getGeojsonData({ occupation_id: occupationId });
             console.log("Fetched occupation data:", data);
-            this.geojsonData = data;
             
             // Update the map source
             this.mapManager.addSource(this.sourceId, data);
@@ -106,7 +106,7 @@ export class OccupationMapController extends BaseMapController {
         }
     }
     
-    addOccupationLayer() {
+    private addOccupationLayer(): void {
         // Assuming the data has a zscore property for the occupation
         const propertyName = `occupation_${this.currentOccupationId}_zscore_cat`;
         
@@ -114,22 +114,22 @@ export class OccupationMapController extends BaseMapController {
         this.addPopupForOccupation();
     }
     
-    addPopupForOccupation() {
+    private addPopupForOccupation(): void {
         const zscoreProperty = `occupation_${this.currentOccupationId}_zscore`;
         
         this.mapManager.addPopupEvents('occupation-layer', `Occupation: ${this.currentOccupationId}`, zscoreProperty);
     }
     
-    clearMap() {
+    protected clearMap(): void {
         super.clearMap();
         this.currentOccupationId = null;
     }
 
-    getLayerIds() {
+    protected getLayerIds(): string[] {
         return ['occupation-layer'];
     }
     
-    getCachedOccupationIds() {
+    private getCachedOccupationIds(): string[] | null {
         const cacheKey = 'occupation_ids_cache';
         const cacheTimeKey = 'occupation_ids_cache_time';
         const cacheTTL = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
@@ -151,14 +151,14 @@ export class OccupationMapController extends BaseMapController {
                 return null;
             }
             
-            return JSON.parse(cachedData);
+            return JSON.parse(cachedData) as string[];
         } catch (error) {
             console.error("Error reading from cache:", error);
             return null;
         }
     }
     
-    cacheOccupationIds(occupationIds) {
+    private cacheOccupationIds(occupationIds: string[]): void {
         const cacheKey = 'occupation_ids_cache';
         const cacheTimeKey = 'occupation_ids_cache_time';
         
@@ -171,7 +171,7 @@ export class OccupationMapController extends BaseMapController {
         }
     }
     
-    clearOccupationCache() {
+    clearOccupationCache(): void {
         localStorage.removeItem('occupation_ids_cache');
         localStorage.removeItem('occupation_ids_cache_time');
     }
