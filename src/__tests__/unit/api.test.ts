@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { ApiService } from '../../js/api';
-import { createFetchResponse, createFetchErrorResponse, setupMockFetch } from '../utils/testHelpers';
+import { createFetchResponse, createFetchErrorResponse } from '../utils/testHelpers';
 import { mockOccupationIdsResponse, mockGeoJSONResponse } from '../fixtures/apiResponses';
 
 describe('ApiService', () => {

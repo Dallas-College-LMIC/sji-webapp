@@ -74,7 +74,6 @@ describe('OccupationMapController', () => {
   let mockLocalStorage: Storage;
   
   // Access the mocked instances
-  const mockMapManagerInstance = mockMapManager;
   const mockCacheServiceInstance = mockCacheService;
 
   beforeEach(() => {
@@ -179,7 +178,7 @@ describe('OccupationMapController', () => {
       
       expect(mockCacheServiceInstance.get).toHaveBeenCalledWith('occupation_ids');
       expect(apiService.getOccupationIds).not.toHaveBeenCalled();
-      expect(global.$).toHaveBeenCalledWith('#occupation-select');
+      expect((global as any).$).toHaveBeenCalledWith('#occupation-select');
     });
 
     it('should fetch from API when cache is expired', async () => {
@@ -241,13 +240,13 @@ describe('OccupationMapController', () => {
       expect(() => controller['populateOccupationDropdown'](occupationIds)).not.toThrow();
       
       // Verify jQuery calls are made
-      expect(global.$).toHaveBeenCalledWith('#occupation-select');
+      expect((global as any).$).toHaveBeenCalledWith('#occupation-select');
       expect(global.Option).toHaveBeenCalledTimes(3);
     });
 
     it('should initialize select2 and setup change listener', () => {
       const occupationIds = ['11-1011'];
-      const mockSelect = global.$('#occupation-select');
+      const mockSelect = (global as any).$('#occupation-select');
       
       controller['populateOccupationDropdown'](occupationIds);
       

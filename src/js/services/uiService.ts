@@ -12,7 +12,7 @@ export interface NotificationOptions {
     type: 'success' | 'error' | 'warning' | 'info';
     message: string;
     duration?: number;
-    position?: 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left' | 'center';
+    position?: 'top' | 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left' | 'center';
     dismissible?: boolean;
 }
 
@@ -404,7 +404,7 @@ export class UIService {
     /**
      * Position notification element
      */
-    private positionNotification(notification: HTMLElement, position: string): void {
+    private positionNotification(notification: HTMLElement, position: 'top' | 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left' | 'center'): void {
         // Handle special case for 'top' position - create container for test compatibility
         if (position === 'top') {
             let container = document.querySelector('.notification-container-top') as HTMLElement;

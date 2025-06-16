@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import '../../mocks/mapbox-gl';
+import { TestableBaseMapController } from './testableBaseMapController';
 
 // Use vi.hoisted to ensure mock is created before imports
 const { mockMapManager } = vi.hoisted(() => {
@@ -12,6 +13,11 @@ const { mockMapManager } = vi.hoisted(() => {
     addSource: vi.fn(),
     setLayoutProperty: vi.fn(),
   },
+  containerId: 'test-container',
+  popup: {} as any,
+  initializeMap: vi.fn(),
+  addControls: vi.fn(),
+  createLayerColor: vi.fn(),
   addSource: vi.fn(),
   addLayer: vi.fn(),
   clearLayers: vi.fn(),
@@ -33,7 +39,7 @@ vi.mock('../../../js/mapUtils', () => {
 });
 
 // Now import the actual modules
-import { BaseMapController, DataLoadConfig } from '../../../js/controllers/baseMapController';
+import type { DataLoadConfig } from '../../../js/controllers/baseMapController';
 import { ApiService } from '../../../js/api';
 import { mockGeoJSONResponse } from '../../fixtures/apiResponses';
 vi.mock('../../../js/api');
@@ -46,20 +52,9 @@ vi.mock('../../../js/services/uiService', () => ({
   },
 }));
 
-// Create a concrete implementation for testing
-class TestMapController extends BaseMapController {
-  async initialize(): Promise<void> {
-    await this.initializeMapWithEmptySource();
-    this.isInitialized = true;
-  }
-  
-  protected getLayerIds(): string[] {
-    return ['layer1', 'layer2'];
-  }
-}
 
 describe('BaseMapController', () => {
-  let controller: TestMapController;
+  let controller: TestableBaseMapController;
   let mockApiService: ApiService;
 
   beforeEach(() => {
@@ -72,10 +67,8 @@ describe('BaseMapController', () => {
     } as any;
     
     // Create controller
-    controller = new TestMapController('test-container', 'test-source');
+    controller = new TestableBaseMapController('test-container', 'test-source', mockMapManager as any);
     
-    // Manually replace the mapManager with our mock
-    controller['mapManager'] = mockMapManager;
     
     // Replace API service with mock
     controller['apiService'] = mockApiService;
@@ -83,7 +76,7 @@ describe('BaseMapController', () => {
 
   describe('constructor', () => {
     it('should initialize with default values', () => {
-      const newController = new TestMapController('container-id');
+      const newController = new TestableBaseMapController('container-id', 'map_data', mockMapManager as any);
       expect(newController['containerId']).toBe('container-id');
       expect(newController['sourceId']).toBe('map_data');
       expect(newController['isInitialized']).toBe(false);
@@ -91,21 +84,20 @@ describe('BaseMapController', () => {
     });
 
     it('should accept custom source ID', () => {
-      const newController = new TestMapController('container-id', 'custom-source');
+      const newController = new TestableBaseMapController('container-id', 'map_data', mockMapManager as any);
       expect(newController['sourceId']).toBe('custom-source');
     });
   });
 
   describe('initializeMapWithEmptySource', () => {
     it('should wait for map to load and add empty source', async () => {
-      const onLoadCallback = vi.fn();
       mockMapManager.map.isStyleLoaded = vi.fn(() => false);
       mockMapManager.onStyleLoad = vi.fn((callback) => {
         // Simulate immediate callback
         callback();
       });
 
-      await controller.initializeMapWithEmptySource();
+      await controller.testInitializeMapWithEmptySource();
 
       expect(mockMapManager.onStyleLoad).toHaveBeenCalledWith(expect.any(Function));
       expect(mockMapManager.addSource).toHaveBeenCalledWith('test-source', {
@@ -121,7 +113,7 @@ describe('BaseMapController', () => {
         callback();
       });
 
-      await controller.initializeMapWithEmptySource();
+      await controller.testInitializeMapWithEmptySource();
 
       expect(mockMapManager.addSource).toHaveBeenCalledWith('test-source', {
         type: 'FeatureCollection',
@@ -138,7 +130,7 @@ describe('BaseMapController', () => {
     it('should load data successfully', async () => {
       vi.mocked(mockApiService.getGeojsonData).mockResolvedValue(mockGeoJSONResponse);
 
-      await controller.loadData();
+      await controller.testLoadData();
 
       expect(mockApiService.getGeojsonData).toHaveBeenCalledWith({});
       expect(mockMapManager.addSource).toHaveBeenCalledWith('test-source', mockGeoJSONResponse);
@@ -151,7 +143,7 @@ describe('BaseMapController', () => {
         params: { occupation_id: '11-1011' },
       };
 
-      await controller.loadData(config);
+      await controller.testLoadData(config);
 
       expect(mockApiService.getGeojsonData).toHaveBeenCalledWith({ occupation_id: '11-1011' });
     });
@@ -164,7 +156,7 @@ describe('BaseMapController', () => {
         loadingElementId: 'loading-spinner',
       };
 
-      await controller.loadData(config);
+      await controller.testLoadData(config);
 
       expect(uiService.showLoading).toHaveBeenCalledWith('loading-spinner', { message: 'Loading map data...' });
       expect(uiService.hideLoading).toHaveBeenCalledWith('loading-spinner');
@@ -177,7 +169,7 @@ describe('BaseMapController', () => {
         clearBeforeLoad: true,
       };
 
-      await controller.loadData(config);
+      await controller.testLoadData(config);
 
       // Clear layers is done manually by getting layer IDs and removing them
       expect(controller['getLayerIds']).toBeDefined();
@@ -194,7 +186,7 @@ describe('BaseMapController', () => {
         onAfterLoad,
       };
 
-      await controller.loadData(config);
+      await controller.testLoadData(config);
 
       expect(onBeforeLoad).toHaveBeenCalled();
       expect(onAfterLoad).toHaveBeenCalledWith(mockGeoJSONResponse);
@@ -211,7 +203,7 @@ describe('BaseMapController', () => {
         loadingElementId: 'loading',
       };
 
-      await controller.loadData(config);
+      await controller.testLoadData(config);
 
       expect(onError).toHaveBeenCalledWith(error);
       expect(uiService.showError).toHaveBeenCalledWith('loading', 'Error loading data');
@@ -223,8 +215,8 @@ describe('BaseMapController', () => {
         new Promise(resolve => setTimeout(() => resolve(mockGeoJSONResponse), 100))
       );
 
-      const promise1 = controller.loadData();
-      const promise2 = controller.loadData();
+      const promise1 = controller.testLoadData();
+      const promise2 = controller.testLoadData();
 
       await Promise.all([promise1, promise2]);
 
@@ -246,7 +238,7 @@ describe('BaseMapController', () => {
         updateExportLink: true,
       };
 
-      await controller.loadData(config);
+      await controller.testLoadData(config);
 
       expect(exportLink.href).toBe('http://127.0.0.1:8000/geojson');
       expect(exportLink.download).toMatch(/^data_\d{4}-\d{2}-\d{2}\.geojson$/);
@@ -283,21 +275,21 @@ describe('BaseMapController', () => {
   describe('UI helper methods', () => {
     it('should show loading state', async () => {
       const { uiService } = await import('../../../js/services/uiService');
-      controller.showLoading('test-element', 'Loading...');
+      controller.testShowLoading('test-element', 'Loading...');
       
       expect(uiService.showLoading).toHaveBeenCalledWith('test-element', { message: 'Loading...' });
     });
 
     it('should hide loading state', async () => {
       const { uiService } = await import('../../../js/services/uiService');
-      controller.hideLoading('test-element');
+      controller.testHideLoading('test-element');
       
       expect(uiService.hideLoading).toHaveBeenCalledWith('test-element');
     });
 
     it('should show error state', async () => {
       const { uiService } = await import('../../../js/services/uiService');
-      controller.showError('test-element', 'Error message');
+      controller.testShowError('test-element', 'Error message');
       
       expect(uiService.showError).toHaveBeenCalledWith('test-element', 'Error message');
     });
@@ -305,7 +297,7 @@ describe('BaseMapController', () => {
 
   describe('clearMap', () => {
     it('should clear all layers and update source', () => {
-      controller.clearMap();
+      controller.testClearMap();
 
       // Clear layers is done manually by getting layer IDs and removing them
       expect(controller['getLayerIds']).toBeDefined();
@@ -335,7 +327,7 @@ describe('BaseMapController', () => {
         },
       ];
 
-      controller.addLayersFromConfig(layers);
+      controller.testAddLayersFromConfig(layers);
 
       expect(mockMapManager.addLayer).toHaveBeenCalledTimes(2);
       expect(mockMapManager.addLayer).toHaveBeenCalledWith(

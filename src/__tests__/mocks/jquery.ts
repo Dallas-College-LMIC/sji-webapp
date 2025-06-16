@@ -3,7 +3,7 @@ import { vi } from 'vitest';
 // Mock jQuery and Select2
 export const mockSelect2 = vi.fn().mockReturnThis();
 
-export const mockJQuery = vi.fn((selector: any) => {
+export const mockJQuery = vi.fn((_selector: any) => {
   const element = {
     find: vi.fn().mockReturnThis(),
     remove: vi.fn().mockReturnThis(),

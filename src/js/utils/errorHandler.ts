@@ -268,7 +268,7 @@ export class ErrorHandler {
     /**
      * Enhanced error logging with structured data
      */
-    static logError(error: Error, context: string, additionalInfo: Record<string, any> = {}): void {
+    static logError(error: Error, context: string, _additionalInfo: Record<string, any> = {}): void {
         const errorContext = this.analyzeError(error);
         
         // Simple logging format for test compatibility

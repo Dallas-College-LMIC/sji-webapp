@@ -114,8 +114,8 @@ describe('ErrorHandler', () => {
       
       const history = ErrorHandler.getErrorHistory();
       expect(history).toHaveLength(1);
-      expect(history[0].error).toBe(error);
-      expect(history[0].context).toBe('TestOperation');
+      expect(history[0]?.error).toBe(error);
+      expect(history[0]?.context).toBe('TestOperation');
     });
 
     it('should limit error history size', () => {
@@ -126,7 +126,7 @@ describe('ErrorHandler', () => {
       
       const history = ErrorHandler.getErrorHistory();
       expect(history).toHaveLength(50);
-      expect(history[0].context).toBe('Context 10'); // Oldest should be removed
+      expect(history[0]?.context).toBe('Context 10'); // Oldest should be removed
     });
   });
 
