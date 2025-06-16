@@ -31,7 +31,7 @@ export default defineConfig({
   },
   
   // Base path for assets (useful for deployment)
-  base: './',
+  base: '/sji-webapp/',
   
   // Asset handling
   assetsInclude: ['**/*.png', '**/*.jpg', '**/*.jpeg', '**/*.gif', '**/*.svg']
