@@ -84,7 +84,7 @@ describe('BaseMapController', () => {
     });
 
     it('should accept custom source ID', () => {
-      const newController = new TestableBaseMapController('container-id', 'map_data', mockMapManager as any);
+      const newController = new TestableBaseMapController('container-id', 'custom-source', mockMapManager as any);
       expect(newController['sourceId']).toBe('custom-source');
     });
   });
