@@ -1,11 +1,19 @@
 import { BaseMapController } from './controllers/baseMapController';
+import { createCacheService, ICacheService } from './services/cacheService';
+import { uiService } from './services/uiService';
+import { ErrorHandler } from './utils/errorHandler';
 
 export class OccupationMapController extends BaseMapController {
-    private currentOccupationId: string | null;
+    private currentOccupationId: string | null; // Used to track the currently selected occupation
+    private cacheService: ICacheService;
+    private readonly CACHE_KEY = 'occupation_ids';
+    private readonly CACHE_TTL = 24 * 60 * 60; // 24 hours in seconds
 
     constructor(containerId: string) {
         super(containerId, 'occupation_data');
         this.currentOccupationId = null;
+        this.cacheService = createCacheService('localStorage', 'sji_webapp');
+        this.migrateOldCache();
         this.initialize();
     }
 
@@ -15,16 +23,19 @@ export class OccupationMapController extends BaseMapController {
         
         // Load occupation IDs asynchronously (non-blocking)
         this.loadOccupationIds().catch(error => {
-            console.error("Failed to load occupation IDs:", error);
+            const err = error instanceof Error ? error : new Error(String(error));
+            ErrorHandler.logError(err, 'Occupation IDs Loading', {
+                controller: 'OccupationMapController'
+            });
         });
     }
 
     private async loadOccupationIds(): Promise<void> {
-        this.showLoading('loading');
+        this.showLoading('loading', 'Loading occupations...');
         
         try {
             // Check cache first
-            const cachedData = this.getCachedOccupationIds();
+            const cachedData = this.cacheService.get<string[]>(this.CACHE_KEY);
             if (cachedData) {
                 console.log("Using cached occupation IDs");
                 this.populateOccupationDropdown(cachedData);
@@ -37,17 +48,23 @@ export class OccupationMapController extends BaseMapController {
             console.log("Loaded occupation IDs response:", response);
             
             // Handle new API structure - extract occupation_ids array from response
-            const occupationIds = response.occupation_ids || (response as any);
+            const occupationIds = response.occupation_ids || (Array.isArray(response) ? response : []);
             
-            // Cache the data
-            this.cacheOccupationIds(occupationIds);
+            // Cache the data with TTL
+            this.cacheService.set(this.CACHE_KEY, occupationIds, this.CACHE_TTL);
             
             this.populateOccupationDropdown(occupationIds);
             
             this.hideLoading('loading');
         } catch (error) {
-            console.error("Error loading occupation IDs:", error);
+            const err = error instanceof Error ? error : new Error(String(error));
+            ErrorHandler.logError(err, 'Load Occupation IDs');
             this.showError('loading', 'Error loading occupations');
+            uiService.showNotification({
+                type: 'error',
+                message: 'Failed to load occupation list. Please refresh the page to try again.',
+                duration: 10000
+            });
         }
     }
     
@@ -58,8 +75,9 @@ export class OccupationMapController extends BaseMapController {
         select.find('option:not(:first)').remove();
         
         // Add occupation options
-        occupationIds.forEach(id => {
-            select.append(new Option(id, id));
+        const options = occupationIds.map(id => ({ value: id, text: id }));
+        options.forEach(option => {
+            select.append(new Option(option.text, option.value));
         });
         
         // Initialize Select2 for searchable dropdown
@@ -69,55 +87,48 @@ export class OccupationMapController extends BaseMapController {
             width: '100%'
         });
         
-        // Set up change event listener
-        select.on('change', (e) => {
-            const selectedOccupation = $(e.target).val() as string;
+        // Set up change event listener using base class method
+        this.setupDropdownChangeHandler('occupation-select', (selectedOccupation) => {
             if (selectedOccupation) {
                 this.loadOccupationData(selectedOccupation);
             } else {
                 this.clearMap();
             }
         });
+        
+        // Show success notification
+        uiService.showNotification({
+            type: 'success',
+            message: `Loaded ${occupationIds.length} occupations`,
+            duration: 3000
+        });
     }
     
     private async loadOccupationData(occupationId: string): Promise<void> {
         this.currentOccupationId = occupationId;
         
-        try {
-            const data = await this.apiService.getGeojsonData({ occupation_id: occupationId });
-            console.log("Fetched occupation data:", data);
-            
-            // Update the map source
-            this.mapManager.addSource(this.sourceId, data);
-            
-            // Remove existing layer if any
-            if (this.mapManager.map.getLayer('occupation-layer')) {
-                this.mapManager.map.removeLayer('occupation-layer');
+        // Generate property names using base class method
+        const properties = this.generatePropertyNames(`occupation_${occupationId}`);
+        
+        // Use base class loadData method
+        await this.loadData({
+            params: { occupation_id: occupationId },
+            clearBeforeLoad: false,
+            onAfterLoad: () => {
+                // Add or update the occupation layer using base class method
+                this.addOrUpdateLayer(
+                    'occupation-layer',
+                    this.sourceId,
+                    properties.zscore_cat,
+                    'visible',
+                    `Occupation: ${occupationId}`,
+                    properties.zscore
+                );
+                
+                // Update export link with current occupation
+                this.updateExportLink({ occupation_id: this.currentOccupationId! });
             }
-            
-            // Add the occupation layer
-            this.addOccupationLayer();
-            
-            // Update export link
-            this.updateExportLink({ occupation_id: occupationId });
-            
-        } catch (error) {
-            console.error("Error loading occupation data:", error);
-        }
-    }
-    
-    private addOccupationLayer(): void {
-        // Assuming the data has a zscore property for the occupation
-        const propertyName = `occupation_${this.currentOccupationId}_zscore_cat`;
-        
-        this.mapManager.addLayer('occupation-layer', this.sourceId, propertyName, 'visible');
-        this.addPopupForOccupation();
-    }
-    
-    private addPopupForOccupation(): void {
-        const zscoreProperty = `occupation_${this.currentOccupationId}_zscore`;
-        
-        this.mapManager.addPopupEvents('occupation-layer', `Occupation: ${this.currentOccupationId}`, zscoreProperty);
+        });
     }
     
     protected clearMap(): void {
@@ -129,50 +140,55 @@ export class OccupationMapController extends BaseMapController {
         return ['occupation-layer'];
     }
     
-    private getCachedOccupationIds(): string[] | null {
-        const cacheKey = 'occupation_ids_cache';
-        const cacheTimeKey = 'occupation_ids_cache_time';
-        const cacheTTL = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
-        
-        try {
-            const cachedTime = localStorage.getItem(cacheTimeKey);
-            const cachedData = localStorage.getItem(cacheKey);
-            
-            if (!cachedTime || !cachedData) {
-                return null;
-            }
-            
-            const cacheAge = Date.now() - parseInt(cachedTime);
-            
-            // Check if cache is expired
-            if (cacheAge > cacheTTL) {
-                localStorage.removeItem(cacheKey);
-                localStorage.removeItem(cacheTimeKey);
-                return null;
-            }
-            
-            return JSON.parse(cachedData) as string[];
-        } catch (error) {
-            console.error("Error reading from cache:", error);
-            return null;
-        }
-    }
-    
-    private cacheOccupationIds(occupationIds: string[]): void {
-        const cacheKey = 'occupation_ids_cache';
-        const cacheTimeKey = 'occupation_ids_cache_time';
-        
-        try {
-            localStorage.setItem(cacheKey, JSON.stringify(occupationIds));
-            localStorage.setItem(cacheTimeKey, Date.now().toString());
-        } catch (error) {
-            console.error("Error writing to cache:", error);
-            // Continue even if caching fails
-        }
-    }
-    
+    /**
+     * Clear the occupation IDs cache
+     */
     clearOccupationCache(): void {
-        localStorage.removeItem('occupation_ids_cache');
-        localStorage.removeItem('occupation_ids_cache_time');
+        this.cacheService.remove(this.CACHE_KEY);
+    }
+    
+    /**
+     * Migrate data from old cache format to new cache service
+     * This ensures backward compatibility for existing users
+     */
+    private migrateOldCache(): void {
+        const oldCacheKey = 'occupation_ids_cache';
+        const oldCacheTimeKey = 'occupation_ids_cache_time';
+        
+        try {
+            const oldData = localStorage.getItem(oldCacheKey);
+            const oldTime = localStorage.getItem(oldCacheTimeKey);
+            
+            if (oldData && oldTime) {
+                const occupationIds = JSON.parse(oldData) as string[];
+                const timestamp = parseInt(oldTime);
+                const age = Date.now() - timestamp;
+                
+                // Only migrate if data is still valid (within TTL)
+                if (age < (this.CACHE_TTL * 1000)) {
+                    // Calculate remaining TTL in seconds
+                    const remainingTTL = Math.floor((this.CACHE_TTL * 1000 - age) / 1000);
+                    this.cacheService.set(this.CACHE_KEY, occupationIds, remainingTTL);
+                    console.log("Migrated occupation IDs from old cache format");
+                }
+                
+                // Remove old cache entries regardless of validity
+                localStorage.removeItem(oldCacheKey);
+                localStorage.removeItem(oldCacheTimeKey);
+            }
+        } catch (error) {
+            const err = error instanceof Error ? error : new Error(String(error));
+            ErrorHandler.logError(err, 'Cache Migration', {
+                action: 'migrate old cache format'
+            });
+            // Clean up old cache on error
+            try {
+                localStorage.removeItem(oldCacheKey);
+                localStorage.removeItem(oldCacheTimeKey);
+            } catch (cleanupError) {
+                const cleanupErr = cleanupError instanceof Error ? cleanupError : new Error(String(cleanupError));
+                ErrorHandler.logError(cleanupErr, 'Cache Cleanup');
+            }
+        }
     }
 }

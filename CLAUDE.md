@@ -21,7 +21,8 @@ The project uses a modern Vite build system with modular ES6 architecture:
 - **Bootstrap 5.0.0-beta2**: UI framework for responsive layout and styling
 - **Select2 4.1.0**: Enhanced searchable dropdown component (occupation map only)
 - **jQuery 3.6.0**: Required dependency for Select2
-- **ES6 Modules**: Modern JavaScript with import/export syntax
+- **TypeScript**: Statically typed JavaScript with strict mode enabled
+- **ES6 Modules**: Modern module system with import/export syntax
 
 ### Data Integration
 - Maps fetch GeoJSON data from API endpoints 
@@ -43,20 +44,32 @@ The project uses a modern Vite build system with modular ES6 architecture:
 
 ### File Structure
 ```
-src/js/
-├── controllers/
-│   └── baseMapController.js    # Base class for map controllers
-├── utils/
-│   ├── appInitializer.js       # Application initialization utilities
-│   └── errorHandler.js         # Centralized error handling
-├── main.js                     # Homepage entry point
-├── occupation-main.js          # Occupation map entry point
-├── wage-main.js               # Wage map entry point
-├── occupation.js              # OccupationMapController (extends BaseMapController)
-├── wage.js                    # WageMapController (extends BaseMapController)
-├── api.js                     # API service for data fetching
-└── mapUtils.js                # Map utilities and layer management
+src/
+├── js/
+│   ├── controllers/
+│   │   └── baseMapController.ts    # Base class for map controllers
+│   ├── utils/
+│   │   ├── appInitializer.ts       # Application initialization utilities
+│   │   └── errorHandler.ts         # Centralized error handling
+│   ├── main.ts                     # Homepage entry point
+│   ├── occupation-main.ts          # Occupation map entry point
+│   ├── wage-main.ts                # Wage map entry point
+│   ├── occupation.ts               # OccupationMapController (extends BaseMapController)
+│   ├── wage.ts                     # WageMapController (extends BaseMapController)
+│   ├── api.ts                      # API service for data fetching
+│   └── mapUtils.ts                 # Map utilities and layer management
+├── types/
+│   ├── api.ts                      # API response type definitions
+│   └── global.d.ts                 # Global type declarations (Mapbox, Select2)
+└── components/
+    └── navigation.ts               # Navigation component
 ```
+
+### TypeScript Configuration
+- **Strict Mode**: Full type safety with `strict: true` in tsconfig.json
+- **Type Definitions**: Custom types for API responses, map data, and controllers
+- **Global Declarations**: Type definitions for external libraries (Mapbox GL, Select2)
+- **Module Resolution**: Node-style module resolution with ES2020 target
 
 ### Development Patterns
 
@@ -74,7 +87,7 @@ src/js/
 
 #### Initialization Pattern
 - `AppInitializer.initialize()` handles common setup with error boundaries
-- Each entry point (`*-main.js`) uses this pattern for consistent behavior
+- Each entry point (`*-main.ts`) uses this pattern for consistent behavior
 - DOM ready checking and controller instantiation
 - Non-blocking initialization: map loads immediately, data loads asynchronously
 
@@ -107,7 +120,7 @@ src/js/
 ## GitHub Pages Deployment
 
 ### Configuration
-- Base path configured in `vite.config.js`: `/sji-webapp/`
+- Base path configured in `vite.config.ts`: `/sji-webapp/`
 - GitHub Pages deployment via `npm run deploy` (uses gh-pages package)
 - Production API URL set via `.env.production` file
 

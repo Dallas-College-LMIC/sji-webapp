@@ -29,8 +29,8 @@ export class AppInitializer {
             return controller;
         } catch (error) {
             const err = error instanceof Error ? error : new Error(String(error));
-            ErrorHandler.logError(err, appName.toLowerCase());
-            ErrorHandler.showErrorMessage(containerId, err, 'application');
+            ErrorHandler.logError(err, `${appName} Initialization`);
+            ErrorHandler.showEnhancedError(containerId, err, 'application');
             throw error; // Re-throw for caller to handle if needed
         }
     }
@@ -42,13 +42,13 @@ export class AppInitializer {
         // Handle unhandled promise rejections
         window.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) => {
             const error = event.reason instanceof Error ? event.reason : new Error(String(event.reason));
-            ErrorHandler.logError(error, 'unhandled-promise');
+            ErrorHandler.logError(error, 'Unhandled Promise Rejection');
             event.preventDefault(); // Prevent the default browser error handling
         });
 
         // Handle general errors
         window.addEventListener('error', (event: ErrorEvent) => {
-            ErrorHandler.logError(event.error, 'global-error', {
+            ErrorHandler.logError(event.error, 'Global Error', {
                 filename: event.filename,
                 lineno: event.lineno,
                 colno: event.colno

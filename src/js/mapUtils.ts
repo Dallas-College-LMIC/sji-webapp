@@ -1,10 +1,22 @@
+/* global mapboxgl */
+
 import { MAP_CONFIG, COLOR_SCHEMES } from './constants';
 import type { GeoJSONResponse } from '../types/api';
+import type { 
+    MapboxMap, 
+    MapboxPopup, 
+    MapboxMapLayerMouseEvent,
+    MapboxFullscreenControl,
+    MapboxNavigationControl,
+    MapboxExpression,
+    MapboxControlPosition
+} from '../types/mapbox';
+import { isGeoJSONSource } from '../types/mapbox';
 
 export class MapManager {
-    public map!: any; // mapboxgl.Map
+    public map!: MapboxMap;
     private containerId: string;
-    private popup!: any; // mapboxgl.Popup
+    private popup!: MapboxPopup;
 
     constructor(containerId: string) {
         this.containerId = containerId;
@@ -12,16 +24,13 @@ export class MapManager {
     }
 
     private initializeMap(): void {
-        // @ts-ignore - mapboxgl is loaded from CDN
         mapboxgl.accessToken = MAP_CONFIG.accessToken;
         
-        // @ts-ignore - mapboxgl is loaded from CDN
         this.map = new mapboxgl.Map({
             container: this.containerId,
             ...MAP_CONFIG
         });
 
-        // @ts-ignore - mapboxgl is loaded from CDN
         this.popup = new mapboxgl.Popup({
             closeButton: true,
             closeOnClick: false,
@@ -34,38 +43,42 @@ export class MapManager {
     }
 
     private addControls(): void {
+        const fullscreenControl = new mapboxgl.FullscreenControl({
+            container: document.querySelector("body") as HTMLElement
+        }) as MapboxFullscreenControl;
+        
         this.map.addControl(
-            // @ts-ignore - mapboxgl is loaded from CDN
-            new mapboxgl.FullscreenControl({
-                container: document.querySelector("body") as HTMLElement
-            }),
-            "bottom-left"
+            fullscreenControl,
+            "bottom-left" as MapboxControlPosition
         );
 
+        const navigationControl = new mapboxgl.NavigationControl({
+            showCompass: true,
+            showZoom: true,
+            visualizePitch: true
+        }) as MapboxNavigationControl;
+
         this.map.addControl(
-            // @ts-ignore - mapboxgl is loaded from CDN
-            new mapboxgl.NavigationControl({
-                showCompass: true,
-                showZoom: true,
-                visualizePitch: true
-            }),
-            "bottom-left"
+            navigationControl,
+            "bottom-left" as MapboxControlPosition
         );
     }
 
-    addSource(sourceId: string, data: GeoJSONResponse | { type: string; features: any[] }): void {
-        if (this.map.getSource(sourceId)) {
-            (this.map.getSource(sourceId) as any).setData(data as any);
+    addSource(sourceId: string, data: GeoJSONResponse | { type: string; features: GeoJSON.Feature[] }): void {
+        const source = this.map.getSource(sourceId);
+        
+        if (source && isGeoJSONSource(source)) {
+            source.setData(data as GeoJSON.FeatureCollection<GeoJSON.Geometry> | GeoJSON.Feature<GeoJSON.Geometry> | String);
         } else {
             this.map.addSource(sourceId, {
                 type: "geojson",
-                data: data as any
+                data: data as GeoJSON.FeatureCollection<GeoJSON.Geometry> | GeoJSON.Feature<GeoJSON.Geometry> | string
             });
         }
     }
 
-    private createLayerColor(propertyName: string): any[] {
-        const layerColor: any[] = ["match", ["get", propertyName]];
+    private createLayerColor(propertyName: string): MapboxExpression {
+        const layerColor: MapboxExpression = ["match", ["get", propertyName]];
         
         COLOR_SCHEMES.zscoreCategories.forEach((category, index) => {
             layerColor.push(category, COLOR_SCHEMES.zscoreColors[index]);
@@ -88,7 +101,7 @@ export class MapManager {
                 visibility: visibility
             },
             paint: {
-                'fill-color': this.createLayerColor(propertyName) as any,
+                'fill-color': this.createLayerColor(propertyName),
                 'fill-outline-color': COLOR_SCHEMES.outlineColor
             }
         });
@@ -101,10 +114,21 @@ export class MapManager {
     }
 
     addPopupEvents(layerId: string, title: string, scoreProperty: string): void {
-        this.map.on('click', layerId, (e: any) => {
+        this.map.on('click', layerId, (e: MapboxMapLayerMouseEvent) => {
             const coordinates = e.lngLat;
-            const properties = e.features[0].properties;
-            const score = properties[scoreProperty];
+            const features = e.features;
+            
+            if (!features || features.length === 0) {
+                return;
+            }
+            
+            const firstFeature = features[0];
+            const properties = firstFeature?.properties;
+            if (!properties) {
+                return;
+            }
+            
+            const score = properties[scoreProperty] as number | undefined;
             
             const description = `
                 <b>Tract: </b><span>${properties.GEOID}</span><br>

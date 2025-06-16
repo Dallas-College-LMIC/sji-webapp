@@ -6,14 +6,14 @@ export interface OccupationIdsResponse {
 
 export interface GeoJSONProperties {
   GEOID: string;
-  [key: string]: any; // Dynamic properties for z-scores
+  [key: string]: string | number | null; // Dynamic properties for z-scores
 }
 
 export interface GeoJSONFeature {
   type: 'Feature';
   geometry: {
-    type: string;
-    coordinates: any;
+    type: 'Polygon' | 'MultiPolygon';
+    coordinates: number[][][] | number[][][][]; // GeoJSON coordinate arrays
   };
   properties: GeoJSONProperties;
 }
