@@ -21,8 +21,11 @@ The project uses a modern Vite build system with modular ES6 architecture:
 - **Bootstrap 5.0.0-beta2**: UI framework for responsive layout and styling
 - **Select2 4.1.0**: Enhanced searchable dropdown component (occupation map only)
 - **jQuery 3.6.0**: Required dependency for Select2
-- **TypeScript**: Statically typed JavaScript with strict mode enabled
+- **TypeScript 5.8.3**: Statically typed JavaScript with strict mode enabled
 - **ES6 Modules**: Modern module system with import/export syntax
+- **Vitest 3.2.3**: Fast testing framework with native ESM support
+- **Testing Library**: DOM testing utilities for user-centric tests
+- **MSW**: Mock Service Worker for API mocking in tests
 
 ### Data Integration
 - Maps fetch GeoJSON data from API endpoints 
@@ -61,8 +64,19 @@ src/
 ├── types/
 │   ├── api.ts                      # API response type definitions
 │   └── global.d.ts                 # Global type declarations (Mapbox, Select2)
-└── components/
-    └── navigation.ts               # Navigation component
+├── components/
+│   └── navigation.ts               # Navigation component
+└── __tests__/
+    ├── unit/
+    │   ├── api.test.ts             # API service unit tests
+    │   ├── mapUtils.test.ts        # Map utilities unit tests
+    │   ├── controllers/            # Controller unit tests
+    │   ├── services/               # Service layer unit tests
+    │   └── utils/                  # Utility function unit tests
+    ├── integration/                # Integration tests
+    ├── fixtures/                   # Test data and mock responses
+    ├── mocks/                      # External library mocks (Mapbox, jQuery)
+    └── setup.ts                    # Test environment configuration
 ```
 
 ### TypeScript Configuration
@@ -117,14 +131,44 @@ src/
 - CSS imported via ES6 modules (`import '../styles/shared.css'`)
 - Map container positioning and legend overlay
 
+## Testing Infrastructure
+
+### Framework & Configuration
+- **Vitest 3.2.3**: Fast testing framework with native ESM and TypeScript support
+- **Happy-DOM**: Lightweight browser environment simulation
+- **Testing Library**: DOM testing utilities with user-centric approach
+- **MSW**: Mock Service Worker for realistic API mocking
+- **Coverage**: V8 coverage with 80% target threshold
+
+### Test Commands
+```bash
+npm test              # Run tests in watch mode
+npm run test:run      # Run tests once
+npm run test:ui       # Open Vitest UI interface
+npm run test:coverage # Generate coverage report
+```
+
+### Testing Strategy
+- **Unit Tests**: Individual components and services with mocked dependencies
+- **Integration Tests**: Multi-component workflows and API interactions
+- **Mock Strategy**: Complete mocks for Mapbox GL JS, jQuery/Select2, and browser APIs
+- **Fixtures**: Realistic test data matching production API responses
+
+### Continuous Integration
+- **GitHub Actions**: Automated testing on push and pull requests
+- **Quality Gates**: All tests must pass for merge approval
+- **Coverage Monitoring**: Prevents coverage regression
+
 ## GitHub Pages Deployment
 
 ### Configuration
 - Base path configured in `vite.config.ts`: `/sji-webapp/`
 - GitHub Pages deployment via `npm run deploy` (uses gh-pages package)
 - Production API URL set via `.env.production` file
+- Automated deployment through GitHub Actions workflow
 
 ### Requirements
 - API must have proper CORS headers for GitHub Pages domain
 - All features including localStorage caching work on static hosting
 - No server-side requirements
+- Build process validates TypeScript and runs tests before deployment
