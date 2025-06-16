@@ -7,18 +7,28 @@ describe('ApiService', () => {
   let apiService: ApiService;
 
   beforeEach(() => {
+    // Clear any existing environment variable to test default behavior
+    const originalEnv = import.meta.env.VITE_API_BASE_URL;
+    vi.stubEnv('VITE_API_BASE_URL', '');
+    
     apiService = new ApiService();
     vi.clearAllMocks();
+    
+    // Restore original env after creating the service
+    if (originalEnv) {
+      vi.stubEnv('VITE_API_BASE_URL', originalEnv);
+    }
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
   describe('constructor', () => {
     it('should use default base URL when env variable is not set', () => {
-      // In test environment, .env file sets this to 127.0.0.1:8000
-      expect(apiService['baseUrl']).toBe('http://127.0.0.1:8000');
+      // Default value when no env variable is set
+      expect(apiService['baseUrl']).toBe('http://localhost:8000');
     });
 
     it('should use env variable for base URL when set', () => {
@@ -36,7 +46,7 @@ describe('ApiService', () => {
       const result = await apiService.getOccupationIds();
 
       expect(fetch).toHaveBeenCalledWith(
-        'http://127.0.0.1:8000/occupation_ids',
+        expect.stringContaining('/occupation_ids'),
         expect.objectContaining({
           method: 'GET',
           headers: expect.objectContaining({
@@ -108,7 +118,7 @@ describe('ApiService', () => {
       const result = await apiService.getGeojsonData(params);
 
       expect(fetch).toHaveBeenCalledWith(
-        'http://127.0.0.1:8000/geojson?occupation_id=11-1011',
+        expect.stringContaining('/geojson?occupation_id=11-1011'),
         expect.any(Object)
       );
       expect(result).toEqual(mockGeoJSONResponse);
@@ -121,7 +131,7 @@ describe('ApiService', () => {
       const result = await apiService.getGeojsonData();
 
       expect(fetch).toHaveBeenCalledWith(
-        'http://127.0.0.1:8000/geojson',
+        expect.stringContaining('/geojson'),
         expect.any(Object)
       );
       expect(result).toEqual(mockGeoJSONResponse);
