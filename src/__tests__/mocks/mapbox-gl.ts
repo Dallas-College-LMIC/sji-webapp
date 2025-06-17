@@ -2,7 +2,11 @@ import { vi } from 'vitest';
 
 // Mock Mapbox GL JS
 export const mockMap = {
-  on: vi.fn(),
+  on: vi.fn((event, callback) => {
+    if (event === 'load') {
+      setTimeout(callback, 0);
+    }
+  }),
   off: vi.fn(),
   once: vi.fn(),
   addControl: vi.fn(),

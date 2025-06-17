@@ -17,21 +17,24 @@ vi.mock('../../js/services/uiService', () => ({
 }));
 
 // Mock DOM elements
-Object.defineProperty(window, 'document', {
-  value: {
-    getElementById: vi.fn((id: string) => {
-      if (id === 'map') {
-        return { offsetWidth: 800, offsetHeight: 600 };
-      }
-      if (id === 'loading' || id === 'exp') {
-        return { style: { display: 'none' }, href: '', download: '' };
-      }
-      return null;
-    }),
-    body: { innerHTML: '' },
-    head: { innerHTML: '' }
+const originalGetElementById = document.getElementById;
+document.getElementById = vi.fn((id: string) => {
+  if (id === 'map') {
+    return { offsetWidth: 800, offsetHeight: 600 } as any;
   }
-});
+  if (id === 'loading' || id === 'exp') {
+    return { style: { display: 'none' }, href: '', download: '' } as any;
+  }
+  if (id === 'occupation-select') {
+    return { 
+      options: [],
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn()
+    } as any;
+  }
+  return originalGetElementById.call(document, id);
+}) as any;
 
 describe('Occupation Caching Integration', () => {
   let controller: OccupationMapController;
