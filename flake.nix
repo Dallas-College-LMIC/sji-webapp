@@ -6,8 +6,14 @@
     flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = { self, nixpkgs, flake-utils }:
-    flake-utils.lib.eachDefaultSystem (system:
+  outputs =
+    {
+      self,
+      nixpkgs,
+      flake-utils,
+    }:
+    flake-utils.lib.eachDefaultSystem (
+      system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
       in
@@ -16,7 +22,7 @@
           buildInputs = with pkgs; [
             nodejs
             nodePackages.npm
-	    uv
+            uv
           ];
 
           shellHook = ''
@@ -25,5 +31,6 @@
             echo "npm version: $(npm --version)"
           '';
         };
-      });
+      }
+    );
 }
