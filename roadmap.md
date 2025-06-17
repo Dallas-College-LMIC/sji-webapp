@@ -24,37 +24,12 @@ This roadmap outlines the current state and future improvements for the Dallas-F
 - ✅ **Build configuration** - Multi-entry point Vite setup
 - ✅ **Asset handling** - Proper static asset configuration
 
-### 4. Code Architecture & Quality (NEW)
-- ✅ **JavaScript refactoring** - Consolidated and cleaned up JS files
-- ✅ **Base controller pattern** - Created `BaseMapController` for shared functionality
-- ✅ **Centralized error handling** - Added `ErrorHandler` utility class
-- ✅ **Application initializer** - Common initialization patterns with `AppInitializer`
-- ✅ **Eliminated code duplication** - Reduced duplicate code by ~40%
-- ✅ **Improved error boundaries** - Global error handlers and user-friendly error messages
-
-### 5. Performance Optimizations (NEW)
-- ✅ **Client-side caching** - Implemented localStorage caching for occupation IDs (24-hour TTL)
-- ✅ **Non-blocking initialization** - Map loads immediately while occupation data loads in background
-- ✅ **Reduced API calls** - ~99% reduction for returning users with cached data
-- ✅ **Improved perceived performance** - Instant map display instead of waiting for data
-
-### 6. TypeScript Migration (COMPLETED - January 2025)
-- ✅ **Full TypeScript conversion** - All JavaScript files migrated to TypeScript
-- ✅ **Strict type checking** - Enabled strict mode in tsconfig.json
-- ✅ **Custom type definitions** - Created types for API responses, map data, and controllers
-- ✅ **Global type declarations** - Added type definitions for Mapbox GL and Select2
-- ✅ **Build system updates** - Vite configuration updated to support TypeScript
-- ✅ **Type-safe API integration** - All API calls and responses fully typed
-- ✅ **Generic types for flexibility** - BaseMapController uses generics for extensibility
-
-### 7. Testing Infrastructure (COMPLETED - June 2025)
-- ✅ **Vitest setup** - Modern testing framework with native ESM support
-- ✅ **Testing Library integration** - DOM testing utilities for user-centric tests
-- ✅ **Comprehensive test suite** - Unit tests for all major components and services
-- ✅ **Mock strategy** - Complete mocks for Mapbox GL JS, jQuery/Select2, and browser APIs
-- ✅ **Test fixtures** - Realistic test data matching production API responses
-- ✅ **Coverage reporting** - V8 coverage with 80% target threshold
-- ✅ **GitHub Actions CI** - Automated testing on push and pull requests
+### 4. Code Architecture & Quality ✅ COMPLETED
+- Modern TypeScript architecture with strict mode
+- Comprehensive testing infrastructure (Vitest + Testing Library)
+- Base controller pattern and centralized error handling
+- Client-side caching with localStorage (24-hour TTL)
+- Non-blocking initialization for improved performance
 
 ---
 
@@ -73,39 +48,9 @@ This roadmap outlines the current state and future improvements for the Dallas-F
 
 ---
 
-## 🔧 Current Architecture (Refactored & Modern)
+## 🔧 Current Architecture
 
-The project now uses a clean, modular architecture with shared utilities:
-
-```
-├── index.html                 # Main landing page
-├── access_occupation.html     # Occupation access map
-├── access_wagelvl.html       # Wage level access map
-├── vite.config.ts            # Vite configuration (TypeScript)
-├── tsconfig.json             # TypeScript configuration (strict mode)
-├── .env.example              # Environment template
-└── src/
-    ├── js/
-    │   ├── controllers/
-    │   │   └── baseMapController.ts  # Shared map controller base class
-    │   ├── utils/
-    │   │   ├── appInitializer.ts     # Common initialization patterns
-    │   │   └── errorHandler.ts       # Centralized error handling
-    │   ├── main.ts           # Landing page entry (enhanced)
-    │   ├── occupation-main.ts # Occupation map entry (simplified) 
-    │   ├── wage-main.ts      # Wage map entry (simplified)
-    │   ├── occupation.ts     # Occupation controller (extends BaseMapController)
-    │   ├── wage.ts           # Wage controller (extends BaseMapController)
-    │   ├── api.ts            # API service
-    │   └── mapUtils.ts       # Map utilities
-    ├── types/
-    │   ├── api.ts            # API response type definitions
-    │   └── global.d.ts       # Global type declarations
-    ├── components/
-    │   └── navigation.ts     # Navigation component
-    └── styles/
-        └── shared.css        # Shared styles
-```
+Modern TypeScript/Vite architecture - see CLAUDE.md for full details.
 
 ---
 
@@ -116,27 +61,10 @@ The project now uses a clean, modular architecture with shared utilities:
 - **Bootstrap**: Currently v5.0.0-beta2 - update to stable v5.3+
 - **jQuery**: Currently v3.6.0 - only used for Select2, consider vanilla alternatives
 
-### 2. ✅ Implement Caching Strategy
-**Status**: Completed for occupation IDs endpoint
-
-**Implemented Solution**:
-- LocalStorage caching with 24-hour TTL for occupation IDs
-- Automatic cache invalidation and refresh
-- Graceful fallback if localStorage unavailable
-- Methods: `getCachedOccupationIds()`, `cacheOccupationIds()`, `clearOccupationCache()`
-
-**Additional Caching Opportunities**:
-- Extend caching to GeoJSON data (with shorter TTL)
-- Implement memory caching for active session
-- Add cache versioning for updates
-
-### 3. ✅ Enhanced Error Handling & User Experience
-**Status**: Completed through JavaScript refactoring
-- ✅ **Global error handlers** - Catch unhandled promises and errors
-- ✅ **Centralized error display** - `ErrorHandler` utility for consistent messaging
-- ✅ **User-friendly error pages** - Better than blank screens or console-only errors
-- ✅ **Loading state management** - Built into `BaseMapController`
-- ✅ **Retry functionality** - Error screens include retry buttons
+### 2. ✅ Caching & Error Handling - COMPLETED
+- LocalStorage caching with 24-hour TTL
+- Global error handlers with user-friendly messaging
+- Loading states and retry functionality
 
 ---
 
@@ -232,53 +160,17 @@ class NavigationManager {
 }
 ```
 
-### 2. ✅ TypeScript Migration (COMPLETED - January 2025)
-**Status**: All JavaScript files have been successfully migrated to TypeScript with strict mode
 
-**Implemented Features**:
-- Full type safety with strict mode enabled in tsconfig.json
-- Custom interfaces for all API responses (`OccupationApiResponse`, `MapApiResponse`)
-- Type definitions for external libraries (Mapbox GL, Select2)
-- Generic types for flexible, reusable code (BaseMapController<T>)
-- Comprehensive error handling with typed catch blocks
-- Type-safe event handlers and DOM manipulation
-
-**Key Type Definitions Added**:
-- `OccupationApiResponse` and `MapApiResponse` for API data
-- `MapData` interface for GeoJSON feature properties
-- Global declarations for Mapbox GL and Select2 jQuery plugins
-- Controller method signatures with proper return types
-- Custom types for map layer configurations and error states
-
-### 3. Testing Strategy
-```javascript
-// Example unit test
-import { describe, it, expect, vi } from 'vitest';
-import { ApiService } from '../src/js/api.js';
-
-describe('ApiService', () => {
-  it('should handle API errors gracefully', async () => {
-    const apiService = new ApiService();
-    global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
-    
-    await expect(apiService.fetchOccupationData()).rejects.toThrow('Network error');
-  });
-
-  it('should cache successful responses', async () => {
-    const apiService = new CachedApiService();
-    const mockData = { features: [] };
-    
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(mockData)
-    });
-
-    await apiService.fetchData('/test');
-    await apiService.fetchData('/test'); // Should use cache
-    
-    expect(fetch).toHaveBeenCalledTimes(1);
-  });
-});
+### 2. Testing & Code Quality
+```json
+// Add to package.json
+{
+  "scripts": {
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
+    "format": "prettier --write src/"
+  }
+}
 ```
 
 ---
@@ -361,31 +253,14 @@ Create comprehensive setup documentation:
 
 ## 🚀 Implementation Timeline
 
-### ~~Phase 1: Security & Critical Issues~~ ✅ COMPLETED
-- ✅ ~~Remove hardcoded credentials~~ - Environment variables implemented
-- ✅ ~~Implement environment variable system~~ - `.env.example` created
-- ⚠️ Fix HTTPS mixed content issues - Still needs production configuration
-- ⚠️ Add basic input validation - Still pending
+### Phase 1: Remaining Security & Production
+- ⚠️ Production HTTPS configuration
+- ⚠️ Input validation implementation
+- ⚠️ Update Mapbox GL JS to v3.x (from v1.12.0)
 
-### ~~Phase 2: Architecture Modernization~~ ✅ COMPLETED  
-- ✅ ~~Consolidate duplicate codebases~~ - Standalone files removed
-- ✅ ~~Extract inline JavaScript~~ - All moved to modules
-- ✅ ~~Set up Vite build process~~ - Fully configured
-- ⚠️ Update Mapbox GL JS to v3.x - Still on v1.12.0
-
-### ~~Phase 3: Performance & UX~~ ✅ MOSTLY COMPLETED
-- ✅ ~~Implement caching layer~~ - LocalStorage caching for occupation IDs
-- ✅ ~~Add loading states and error handling~~ - Comprehensive implementation in place
-- [ ] Create unified navigation component  
-- ✅ ~~Add retry logic for API calls~~ - Error screens include retry buttons
-- ✅ ~~Improve code architecture~~ - Base classes and utilities implemented
-- ✅ ~~Non-blocking initialization~~ - Map loads immediately
-
-### Phase 4: Development Workflow (Mostly Complete)
-- [ ] Add ESLint and Prettier
-- [x] ~~Set up comprehensive testing framework~~ - ✅ COMPLETED (June 2025)
-- [x] ~~Implement CI/CD pipeline~~ - ✅ COMPLETED (June 2025)
-- [x] ~~Add TypeScript configuration~~ - ✅ COMPLETED (January 2025)
+### Phase 2: Development Workflow
+- [ ] Add ESLint and Prettier configuration
+- [ ] Create unified navigation component
 
 ### Phase 5: Accessibility & Polish (Future)
 - [ ] Improve form accessibility
@@ -413,10 +288,9 @@ Create comprehensive setup documentation:
 - [ ] 95% uptime with graceful degradation
 
 ### Code Quality
-- [x] Comprehensive test suite implemented ✅ (June 2025)
-- [ ] 80%+ test coverage (currently at ~47%)
-- [ ] Zero ESLint errors
-- [x] TypeScript migration complete ✅ (January 2025)
+- [x] TypeScript with comprehensive testing ✅
+- [ ] 80%+ test coverage
+- [ ] ESLint/Prettier setup
 
 ---
 
@@ -432,7 +306,7 @@ Create comprehensive setup documentation:
 - **Keep Mapbox GL JS**: Core mapping functionality works well
 - **Maintain Bootstrap**: UI framework provides good responsive design
 - **Consider replacing jQuery**: Only used for Select2, could use vanilla JS alternatives
-- **TypeScript migration complete (January 2025)**: All files now use TypeScript with strict type checking, providing better developer experience and catching errors at compile time
+- **Modern TypeScript/Vite stack**: Full type safety with comprehensive testing infrastructure
 
 ### Deployment Considerations
 - Current static file deployment is simple and effective
