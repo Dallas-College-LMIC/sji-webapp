@@ -34,7 +34,7 @@ jobs:
         run: npm test
         
       - name: Run type checking
-        run: npm run typecheck
+        run: npm run type-check
         
       - name: Generate coverage report
         run: npm run test:coverage
