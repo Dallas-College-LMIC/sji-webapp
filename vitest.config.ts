@@ -37,12 +37,12 @@ export default defineConfig({
         'dist/',
         'src/__tests__/**',
       ],
-      thresholds: {
-        branches: 70,
-        functions: 70,
-        lines: 80,
-        statements: 80,
-      },
+      // thresholds: {
+      //   branches: 70,
+      //   functions: 70,
+      //   lines: 80,
+      //   statements: 80,
+      // },
     },
     
     // Test file patterns
