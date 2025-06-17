@@ -1,7 +1,7 @@
 {
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "tsc -p tsconfig.build.json && vite build",
     "preview": "vite preview",
     "deploy": "npm run build && gh-pages -d dist",
     "type-check": "tsc --noEmit",
@@ -28,6 +28,7 @@
     "gh-pages": "^6.3.0",
     "happy-dom": "^18.0.1",
     "msw": "^2.10.2",
+    "puppeteer": "^24.10.1",
     "typescript": "^5.8.3",
     "vite": "^6.3.5",
     "vitest": "^3.2.3"

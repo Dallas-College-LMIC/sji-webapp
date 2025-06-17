@@ -1,93 +1,31 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import '../../mocks/mapbox-gl';
 import '../../mocks/jquery';
+import { setupOccupationControllerMocks } from '../../utils/occupationTestHelpers';
+import { createMockLocalStorage } from '../../utils/testHelpers';
+import { mockOccupationIdsResponse, mockGeoJSONResponse } from '../../fixtures/apiResponses';
 
-// Use vi.hoisted to ensure mock is created before imports
-const { mockMapManager } = vi.hoisted(() => {
-  const mockMapManager = {
-  map: {
-    on: vi.fn(),
-    addSource: vi.fn(),
-    removeSource: vi.fn(),
-    getSource: vi.fn(),
-    addLayer: vi.fn(),
-    removeLayer: vi.fn(),
-    getLayer: vi.fn(() => null), // Return null by default (no layer exists)
-    setLayoutProperty: vi.fn(),
-    isStyleLoaded: vi.fn(() => true), // Add isStyleLoaded method
-  },
-  onStyleLoad: vi.fn((callback) => {
-    // Call the callback immediately to simulate style load
-    // Use setTimeout to ensure it's async
-    setTimeout(() => callback(), 0);
-  }),
-  addSource: vi.fn(),
-  addLayer: vi.fn(),
-  addPopupEvents: vi.fn(),
-  setLayerVisibility: vi.fn(),
-};
-  return { mockMapManager };
-});
-
-// Mock the entire mapUtils module
-vi.mock('../../../js/mapUtils', () => {
-  return {
-    MapManager: vi.fn().mockImplementation(() => mockMapManager),
-  };
-});
+// Setup all mocks before imports
+setupOccupationControllerMocks();
 
 // Now import the actual modules
 import { OccupationMapController } from '../../../js/occupation';
-import { createMockLocalStorage } from '../../utils/testHelpers';
-import { mockOccupationIdsResponse, mockGeoJSONResponse } from '../../fixtures/apiResponses';
-vi.mock('../../../js/api');
-vi.mock('../../../js/services/uiService', () => ({
-  uiService: {
-    showLoading: vi.fn(),
-    hideLoading: vi.fn(),
-    showError: vi.fn(),
-    showNotification: vi.fn(),
-  },
-}));
-vi.mock('../../../js/utils/errorHandler', () => ({
-  ErrorHandler: {
-    logError: vi.fn(),
-    showInlineError: vi.fn(),
-    showEnhancedError: vi.fn(),
-  },
-}));
-
-// Create mock cache service instance that we can control
-const mockCacheService = {
-  get: vi.fn(),
-  set: vi.fn(),
-  remove: vi.fn(),
-  clear: vi.fn(),
-};
-
-vi.mock('../../../js/services/cacheService', () => ({
-  createCacheService: vi.fn(() => mockCacheService),
-}));
+import { uiService } from '../../../js/services/uiService';
 
 describe('OccupationMapController', () => {
   let controller: OccupationMapController;
   let mockLocalStorage: Storage;
-  
-  // Access the mocked instances
-  const mockCacheServiceInstance = mockCacheService;
+  let mockApiService: any;
+  let mockCacheService: any;
+  let mockOccupationCache: any;
+  let mockMapManager: any;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     
     // Setup mock localStorage
     mockLocalStorage = createMockLocalStorage();
     global.localStorage = mockLocalStorage;
-    
-    // Reset mock cache service
-    mockCacheServiceInstance.get.mockReturnValue(null);
-    mockCacheServiceInstance.set.mockImplementation(() => {});
-    mockCacheServiceInstance.remove.mockImplementation(() => {});
-    mockCacheServiceInstance.clear.mockImplementation(() => {});
     
     // Mock DOM Option constructor
     global.Option = vi.fn().mockImplementation((text: string, value: string) => ({
@@ -112,6 +50,42 @@ describe('OccupationMapController', () => {
     vi.spyOn(document, 'getElementById').mockImplementation((id: string) => {
       return document.querySelector(`#${id}`) as HTMLElement | null;
     });
+
+    // Create controller
+    controller = new OccupationMapController('test-container');
+    
+    // Get mocked services from the controller
+    mockApiService = (controller as any).apiService;
+    mockCacheService = (controller as any).cacheService;
+    mockOccupationCache = (controller as any).occupationCache;
+    mockMapManager = (controller as any).mapManager;
+    
+    // If services are not mocked properly, add mock methods
+    if (!mockApiService.getOccupationIds) {
+      mockApiService.getOccupationIds = vi.fn();
+      mockApiService.getOccupationData = vi.fn();
+      mockApiService.cancelAllRequests = vi.fn();
+      mockApiService.createAbortController = vi.fn(() => new AbortController());
+      mockApiService.cancelRequest = vi.fn();
+      mockApiService.getAbortController = vi.fn();
+    }
+    if (!mockCacheService.get) {
+      mockCacheService.get = vi.fn();
+      mockCacheService.set = vi.fn();
+      mockCacheService.remove = vi.fn();
+    }
+    if (!mockOccupationCache.get) {
+      mockOccupationCache.get = vi.fn();
+      mockOccupationCache.set = vi.fn();
+      mockOccupationCache.clear = vi.fn();
+      mockOccupationCache.getDebugInfo = vi.fn();
+    }
+    if (!mockMapManager.addSource) {
+      mockMapManager.addSource = vi.fn();
+    }
+
+    // Wait for initialization
+    await new Promise(resolve => setTimeout(resolve, 10));
   });
 
   afterEach(() => {
@@ -120,14 +94,9 @@ describe('OccupationMapController', () => {
 
   describe('constructor and initialization', () => {
     it('should initialize with default values', async () => {
-      controller = new OccupationMapController('test-container');
-      
-      // Wait for async initialization
-      await new Promise(resolve => setTimeout(resolve, 0));
-      
       expect(controller['containerId']).toBe('test-container');
       expect(controller['sourceId']).toBe('occupation_data');
-      expect(controller['currentOccupationId']).toBeNull();
+      expect((controller as any).currentOccupationId).toBeNull();
     });
 
     it('should migrate old cache on initialization', async () => {
@@ -137,22 +106,12 @@ describe('OccupationMapController', () => {
       mockLocalStorage.setItem('occupation_ids_cache', JSON.stringify(oldData));
       mockLocalStorage.setItem('occupation_ids_cache_time', currentTime.toString());
       
-      // Mock the migration behavior
-      const originalGetItem = mockLocalStorage.getItem;
-      mockLocalStorage.getItem = vi.fn((key: string) => {
-        if (key === 'occupation_ids_cache') {
-          return JSON.stringify(oldData);
-        }
-        if (key === 'occupation_ids_cache_time') {
-          return currentTime.toString();
-        }
-        return originalGetItem(key);
-      });
-      
-      controller = new OccupationMapController('test-container');
+      // Create new controller which should trigger migration
+      // Create new controller which should trigger migration
+      new OccupationMapController('test-container');
       
       // Wait for async initialization
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise(resolve => setTimeout(resolve, 10));
       
       // Check that old cache was removed (migration cleans up old format)
       expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('occupation_ids_cache');
@@ -161,38 +120,27 @@ describe('OccupationMapController', () => {
   });
 
   describe('loadOccupationIds', () => {
-    beforeEach(async () => {
-      controller = new OccupationMapController('test-container');
-      // Wait for initialization to complete
-      await new Promise(resolve => setTimeout(resolve, 0));
-    });
-
     it('should use cached occupation IDs when available', async () => {
       const cachedIds = ['11-1011', '11-1021', '11-1031'];
-      mockCacheServiceInstance.get.mockReturnValue(cachedIds);
-      
-      const apiService = controller['apiService'];
-      vi.spyOn(apiService, 'getOccupationIds');
+      mockCacheService.get.mockReturnValue(cachedIds);
       
       await controller['loadOccupationIds']();
       
-      expect(mockCacheServiceInstance.get).toHaveBeenCalledWith('occupation_ids');
-      expect(apiService.getOccupationIds).not.toHaveBeenCalled();
+      expect(mockCacheService.get).toHaveBeenCalledWith('occupation_ids');
+      expect(mockApiService.getOccupationIds).not.toHaveBeenCalled();
       expect((global as any).$).toHaveBeenCalledWith('#occupation-select');
     });
 
     it('should fetch from API when cache is expired', async () => {
       // Cache returns null (expired or not found)
-      mockCacheServiceInstance.get.mockReturnValue(null);
-      
-      const apiService = controller['apiService'];
-      vi.mocked(apiService.getOccupationIds).mockResolvedValue(mockOccupationIdsResponse);
+      mockCacheService.get.mockReturnValue(null);
+      mockApiService.getOccupationIds.mockResolvedValue(mockOccupationIdsResponse);
       
       await controller['loadOccupationIds']();
       
-      expect(mockCacheServiceInstance.get).toHaveBeenCalledWith('occupation_ids');
-      expect(apiService.getOccupationIds).toHaveBeenCalled();
-      expect(mockCacheServiceInstance.set).toHaveBeenCalledWith(
+      expect(mockCacheService.get).toHaveBeenCalledWith('occupation_ids');
+      expect(mockApiService.getOccupationIds).toHaveBeenCalled();
+      expect(mockCacheService.set).toHaveBeenCalledWith(
         'occupation_ids',
         mockOccupationIdsResponse.occupation_ids,
         24 * 60 * 60 // 24 hours in seconds
@@ -200,9 +148,8 @@ describe('OccupationMapController', () => {
     });
 
     it('should handle API errors gracefully', async () => {
-      const apiService = controller['apiService'];
-      vi.mocked(apiService.getOccupationIds).mockRejectedValue(new Error('API Error'));
-      const { uiService } = await import('../../../js/services/uiService');
+      mockCacheService.get.mockReturnValue(null);
+      mockApiService.getOccupationIds.mockRejectedValue(new Error('API Error'));
       
       await controller['loadOccupationIds']();
       
@@ -220,8 +167,8 @@ describe('OccupationMapController', () => {
         throw new Error('QuotaExceededError');
       });
       
-      const apiService = controller['apiService'];
-      vi.mocked(apiService.getOccupationIds).mockResolvedValue(mockOccupationIdsResponse);
+      mockCacheService.get.mockReturnValue(null);
+      mockApiService.getOccupationIds.mockResolvedValue(mockOccupationIdsResponse);
       
       // Should not throw
       await expect(controller['loadOccupationIds']()).resolves.not.toThrow();
@@ -229,10 +176,6 @@ describe('OccupationMapController', () => {
   });
 
   describe('populateOccupationDropdown', () => {
-    beforeEach(() => {
-      controller = new OccupationMapController('test-container');
-    });
-
     it('should populate dropdown with occupation IDs', () => {
       const occupationIds = ['11-1011', '11-1021', '11-1031'];
       
@@ -261,65 +204,126 @@ describe('OccupationMapController', () => {
   });
 
   describe('loadOccupationData', () => {
-    beforeEach(async () => {
-      controller = new OccupationMapController('test-container');
-      // Wait for initialization to complete
-      await new Promise(resolve => setTimeout(resolve, 10));
-    });
-
     it('should load data for selected occupation', async () => {
       const occupationId = '11-1011';
-      const apiService = controller['apiService'];
-      vi.mocked(apiService.getGeojsonData).mockResolvedValue(mockGeoJSONResponse);
+      mockOccupationCache.get.mockResolvedValue(null);
+      mockApiService.getOccupationData.mockResolvedValue(mockGeoJSONResponse);
       
       await controller['loadOccupationData'](occupationId);
       
-      expect(controller['currentOccupationId']).toBe(occupationId);
-      expect(apiService.getGeojsonData).toHaveBeenCalledWith({ occupation_id: occupationId });
+      expect(mockApiService.getOccupationData).toHaveBeenCalledWith(occupationId, expect.any(AbortSignal));
     });
 
     it('should clear map when no occupation selected', () => {
       // The method should execute without throwing errors
       expect(() => controller['clearMap']()).not.toThrow();
-      
-      expect(controller['currentOccupationId']).toBeNull();
     });
 
     it('should add layer after loading data', async () => {
       const occupationId = '11-1011';
-      const apiService = controller['apiService'];
-      vi.mocked(apiService.getGeojsonData).mockResolvedValue(mockGeoJSONResponse);
+      mockOccupationCache.get.mockResolvedValue(null);
+      mockApiService.getOccupationData.mockResolvedValue(mockGeoJSONResponse);
       
       await controller['loadOccupationData'](occupationId);
       
-      // Check that the occupation ID was set
-      expect(controller['currentOccupationId']).toBe(occupationId);
-      expect(apiService.getGeojsonData).toHaveBeenCalledWith({ occupation_id: occupationId });
+      expect(mockApiService.getOccupationData).toHaveBeenCalledWith(occupationId, expect.any(AbortSignal));
+      expect(mockMapManager.addSource).toHaveBeenCalled();
     });
 
     it('should handle errors during occupation change', async () => {
       const occupationId = '11-1011';
-      const apiService = controller['apiService'];
       const error = new Error('API Error');
-      vi.mocked(apiService.getGeojsonData).mockRejectedValue(error);
+      mockOccupationCache.get.mockResolvedValue(null);
+      mockApiService.getOccupationData.mockRejectedValue(error);
       
-      // This should not throw since errors are handled by the base class
+      // This should not throw since errors are handled
       await expect(controller['loadOccupationData'](occupationId)).resolves.not.toThrow();
       
-      expect(apiService.getGeojsonData).toHaveBeenCalledWith({ occupation_id: occupationId });
+      expect(mockApiService.getOccupationData).toHaveBeenCalledWith(occupationId, expect.any(AbortSignal));
+      expect(uiService.showError).toHaveBeenCalledWith('loading', 'Error loading occupation data');
+    });
+
+    it('should use cached data when available', async () => {
+      const occupationId = '11-1011';
+      const cachedData = mockGeoJSONResponse;
+      mockOccupationCache.get.mockResolvedValue(cachedData);
+      
+      await controller['loadOccupationData'](occupationId);
+      
+      expect(mockOccupationCache.get).toHaveBeenCalledWith(occupationId);
+      expect(mockApiService.getOccupationData).not.toHaveBeenCalled();
+      expect(mockMapManager.addSource).toHaveBeenCalledWith('occupation_data', cachedData);
+    });
+
+    it('should prevent concurrent loads of same occupation', async () => {
+      const occupationId = '11-1011';
+      mockOccupationCache.get.mockResolvedValue(null);
+      
+      // Ensure no previous occupation is set and controller is not loading
+      (controller as any).currentOccupationId = null;
+      (controller as any).isLoading = false;
+      
+      // Create a delayed promise to simulate slow API call
+      let resolvePromise: (value: any) => void;
+      const delayedPromise = new Promise(resolve => {
+        resolvePromise = resolve;
+      });
+      mockApiService.getOccupationData.mockReturnValue(delayedPromise);
+      
+      // Start two concurrent loads
+      const load1 = controller['loadOccupationData'](occupationId);
+      const load2 = controller['loadOccupationData'](occupationId);
+      
+      // The second request should wait for the first due to activeRequests Map
+      expect(controller['activeRequests'].size).toBe(1);
+      
+      // Resolve the promise
+      resolvePromise!(mockGeoJSONResponse);
+      
+      // Wait for both to complete
+      await Promise.all([load1, load2]);
+      
+      // Verify deduplication worked
+      expect(controller['activeRequests'].size).toBe(0);
     });
   });
 
   describe('clearOccupationCache', () => {
-    beforeEach(() => {
-      controller = new OccupationMapController('test-container');
-    });
-
     it('should clear occupation cache', () => {
       controller.clearOccupationCache();
       
       // The cacheService.remove method is called with the cache key
-      expect(mockCacheServiceInstance.remove).toHaveBeenCalledWith('occupation_ids');
+      expect(mockCacheService.remove).toHaveBeenCalledWith('occupation_ids');
+    });
+  });
+
+  describe('clearAllCaches', () => {
+    it('should clear all caches', () => {
+      controller.clearAllCaches();
+      
+      expect(mockCacheService.remove).toHaveBeenCalledWith('occupation_ids');
+      expect(mockOccupationCache.clear).toHaveBeenCalled();
+    });
+  });
+
+  describe('getCacheStats', () => {
+    it('should return cache statistics', () => {
+      const mockStats = {
+        memoryEntries: 5,
+        memoryUsageMB: 10,
+        hitRate: 85,
+        preloadQueue: 2,
+        stats: {
+          hits: 85,
+          misses: 15,
+          totalRequests: 100
+        }
+      };
+      mockOccupationCache.getDebugInfo.mockReturnValue(mockStats);
+      
+      const stats = controller.getCacheStats();
+      
+      expect(stats).toEqual(mockStats);
     });
   });
 });

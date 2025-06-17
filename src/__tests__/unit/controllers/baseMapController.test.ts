@@ -64,6 +64,10 @@ describe('BaseMapController', () => {
     mockApiService = {
       getGeojsonData: vi.fn(),
       getExportUrl: vi.fn(),
+      createAbortController: vi.fn(() => new AbortController()),
+      cancelAllRequests: vi.fn(),
+      cancelRequest: vi.fn(),
+      getAbortController: vi.fn(),
     } as any;
     
     // Create controller
@@ -132,7 +136,7 @@ describe('BaseMapController', () => {
 
       await controller.testLoadData();
 
-      expect(mockApiService.getGeojsonData).toHaveBeenCalledWith({});
+      expect(mockApiService.getGeojsonData).toHaveBeenCalledWith({}, expect.any(AbortSignal));
       expect(mockMapManager.addSource).toHaveBeenCalledWith('test-source', mockGeoJSONResponse);
     });
 
@@ -145,7 +149,7 @@ describe('BaseMapController', () => {
 
       await controller.testLoadData(config);
 
-      expect(mockApiService.getGeojsonData).toHaveBeenCalledWith({ occupation_id: '11-1011' });
+      expect(mockApiService.getGeojsonData).toHaveBeenCalledWith({ occupation_id: '11-1011' }, expect.any(AbortSignal));
     });
 
     it('should show loading state', async () => {

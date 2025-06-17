@@ -95,17 +95,30 @@ describe('ApiService', () => {
     });
 
     it('should respect timeout', async () => {
-      // Test timeout configuration by manually creating abort error
-      const abortError = new Error('The operation was aborted');
-      abortError.name = 'AbortError';
-      
-      vi.mocked(global.fetch).mockRejectedValueOnce(abortError);
+      // Create a promise that rejects after a delay to simulate timeout
+      vi.mocked(global.fetch).mockImplementationOnce((_, options) => {
+        return new Promise((_, reject) => {
+          // Check if the signal is already aborted
+          if (options?.signal?.aborted) {
+            reject(new DOMException('The operation was aborted', 'AbortError'));
+            return;
+          }
+          
+          // Listen for abort event
+          options?.signal?.addEventListener('abort', () => {
+            reject(new DOMException('The operation was aborted', 'AbortError'));
+          });
+        });
+      });
 
       const apiWithShortTimeout = new ApiService();
       apiWithShortTimeout['defaultConfig'].timeout = 100;
       apiWithShortTimeout['defaultConfig'].retries = 0;
 
-      await expect(apiWithShortTimeout.getOccupationIds()).rejects.toThrow('Request timeout after 60000ms');
+      // Wait a bit longer than the timeout to ensure it triggers
+      await expect(
+        apiWithShortTimeout['fetchData']('/test', {})
+      ).rejects.toThrow('Request timeout after 100ms');
     });
   });
 
