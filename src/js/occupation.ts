@@ -30,7 +30,12 @@ export class OccupationMapController extends BaseMapController {
         });
         
         this.migrateOldCache();
-        this.initialize();
+        this.initialize().catch(error => {
+            const err = error instanceof Error ? error : new Error(String(error));
+            ErrorHandler.logError(err, 'Controller Initialization', {
+                controller: 'OccupationMapController'
+            });
+        });
     }
 
     async initialize(): Promise<void> {

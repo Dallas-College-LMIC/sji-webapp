@@ -12,7 +12,7 @@ export interface NotificationOptions {
     type: 'success' | 'error' | 'warning' | 'info';
     message: string;
     duration?: number;
-    position?: 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left' | 'center';
+    position?: 'top' | 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left' | 'center';
     dismissible?: boolean;
 }
 
@@ -94,7 +94,8 @@ export class UIService {
             element.style.display = originalContent.style.display || '';
             this.loadingElements.delete(elementId);
         } else if (element) {
-            element.style.display = 'none';
+            // If no original content was stored, clear the element
+            element.innerHTML = '';
         }
     }
 
@@ -113,7 +114,10 @@ export class UIService {
         const notification = this.createNotificationElement(type, message, dismissible);
         this.positionNotification(notification, position);
         
-        document.body.appendChild(notification);
+        // Only append to body if not already positioned in a container
+        if (position !== 'top') {
+            document.body.appendChild(notification);
+        }
         this.activeNotifications.add(notification);
 
         // Animate in
@@ -319,19 +323,29 @@ export class UIService {
     /**
      * Show error state for an element
      */
-    showError(elementId: string, message: string): void {
+    showError(elementId: string, message: string, retryCallback?: () => void): void {
         const element = document.getElementById(elementId);
-        if (element) {
-            element.classList.add('is-invalid');
-            
-            // Add error message if not exists
-            let errorElement = element.nextElementSibling;
-            if (!errorElement || !errorElement.classList.contains('invalid-feedback')) {
-                errorElement = document.createElement('div');
-                errorElement.className = 'invalid-feedback';
-                element.parentNode?.insertBefore(errorElement, element.nextSibling);
+        if (!element) {
+            console.warn(`Element with id '${elementId}' not found`);
+            return;
+        }
+
+        // Create error alert similar to Bootstrap alert-danger
+        const errorHTML = `
+            <div class="alert alert-danger" role="alert">
+                ${message}
+                ${retryCallback ? '<button type="button" class="btn btn-sm btn-outline-danger ms-2">Retry</button>' : ''}
+            </div>
+        `;
+
+        element.innerHTML = errorHTML;
+
+        // Add retry functionality if callback provided
+        if (retryCallback) {
+            const retryButton = element.querySelector('button');
+            if (retryButton) {
+                retryButton.addEventListener('click', retryCallback);
             }
-            errorElement.textContent = message;
         }
     }
 
@@ -355,7 +369,16 @@ export class UIService {
      */
     private createNotificationElement(type: string, message: string, dismissible: boolean): HTMLElement {
         const notification = document.createElement('div');
-        notification.className = `notification notification-${type}`;
+        
+        // Use Bootstrap alert classes for compatibility with tests
+        const bootstrapTypeMap: Record<string, string> = {
+            success: 'alert-success',
+            error: 'alert-danger',
+            warning: 'alert-warning',
+            info: 'alert-info'
+        };
+
+        notification.className = `alert ${bootstrapTypeMap[type] || 'alert-info'} notification notification-${type}`;
         
         const iconMap = {
             success: '✓',
@@ -381,16 +404,32 @@ export class UIService {
     /**
      * Position notification element
      */
-    private positionNotification(notification: HTMLElement, position: string): void {
-        const positions: Record<string, string> = {
-            'top-right': 'top: 20px; right: 20px;',
-            'top-left': 'top: 20px; left: 20px;',
-            'bottom-right': 'bottom: 20px; right: 20px;',
-            'bottom-left': 'bottom: 20px; left: 20px;',
-            'center': 'top: 50%; left: 50%; transform: translate(-50%, -50%);'
-        };
+    private positionNotification(notification: HTMLElement, position: 'top' | 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left' | 'center'): void {
+        // Handle special case for 'top' position - create container for test compatibility
+        if (position === 'top') {
+            let container = document.querySelector('.notification-container-top') as HTMLElement;
+            if (!container) {
+                container = document.createElement('div');
+                container.className = 'notification-container-top';
+                container.style.cssText = 'position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 9999;';
+                document.body.appendChild(container);
+            }
+            container.appendChild(notification);
+            notification.style.position = 'relative';
+            notification.style.margin = '10px 0';
+        } else {
+            // Use existing positioning logic for other positions
+            const positions: Record<string, string> = {
+                'top-right': 'top: 20px; right: 20px;',
+                'top-left': 'top: 20px; left: 20px;',
+                'bottom-right': 'bottom: 20px; right: 20px;',
+                'bottom-left': 'bottom: 20px; left: 20px;',
+                'center': 'top: 50%; left: 50%; transform: translate(-50%, -50%);'
+            };
 
-        notification.style.cssText = positions[position] || positions['top-right']!;
+            notification.style.cssText = positions[position] || positions['top-right']!;
+        }
+        
         this.ensureNotificationStyles();
     }
 
@@ -526,6 +565,32 @@ export class UIService {
         this.loadingElements.forEach((_, elementId) => {
             this.hideLoading(elementId);
         });
+    }
+
+    /**
+     * Update element content (alias for updateHTML for backward compatibility)
+     */
+    updateElementContent(elementId: string, content: string): void {
+        this.updateHTML(elementId, content);
+    }
+
+    /**
+     * Set element visibility (alias for toggleVisibility with explicit visible parameter)
+     */
+    setElementVisibility(elementId: string, visible: boolean): void {
+        this.toggleVisibility(elementId, visible);
+    }
+
+    /**
+     * Add tooltip attributes to element for Bootstrap tooltips
+     */
+    addTooltip(elementId: string, title: string, placement: string = 'top'): void {
+        const element = document.getElementById(elementId);
+        if (element) {
+            element.setAttribute('data-bs-toggle', 'tooltip');
+            element.setAttribute('data-bs-placement', placement);
+            element.setAttribute('title', title);
+        }
     }
 }
 
