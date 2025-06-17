@@ -205,9 +205,17 @@ export class ApiService {
         });
     }
 
+    async getOccupationData(occupationId: string): Promise<GeoJSONResponse> {
+        return this.fetchData<GeoJSONResponse>(`/occupation_data/${occupationId}`);
+    }
+
     getExportUrl(params: Record<string, string> = {}): string {
         const queryString = new URLSearchParams(params).toString();
         return queryString ? `${this.baseUrl}/geojson?${queryString}` : `${this.baseUrl}/geojson`;
+    }
+
+    getOccupationExportUrl(occupationId: string): string {
+        return `${this.baseUrl}/occupation_data/${occupationId}`;
     }
 
     /**
