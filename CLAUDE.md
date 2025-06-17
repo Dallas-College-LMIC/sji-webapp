@@ -51,9 +51,15 @@ src/
 ├── js/
 │   ├── controllers/
 │   │   └── baseMapController.ts    # Base class for map controllers
+│   ├── services/
+│   │   ├── cacheService.ts         # Generic caching infrastructure
+│   │   ├── occupationCacheService.ts # Occupation-specific caching service
+│   │   ├── occupationIdsCacheService.ts # Occupation IDs caching service
+│   │   └── uiService.ts            # UI state management service
 │   ├── utils/
 │   │   ├── appInitializer.ts       # Application initialization utilities
 │   │   └── errorHandler.ts         # Centralized error handling
+│   ├── constants.ts                # Application constants
 │   ├── main.ts                     # Homepage entry point
 │   ├── occupation-main.ts          # Occupation map entry point
 │   ├── wage-main.ts                # Wage map entry point
@@ -69,13 +75,32 @@ src/
 └── __tests__/
     ├── unit/
     │   ├── api.test.ts             # API service unit tests
-    │   ├── mapUtils.test.ts        # Map utilities unit tests
+    │   ├── main.test.ts            # Main entry point tests
+    │   ├── components/             # Component unit tests
+    │   │   └── navigation.test.ts  # Navigation component tests
     │   ├── controllers/            # Controller unit tests
+    │   │   ├── baseMapController.test.ts
+    │   │   ├── occupationMapController.test.ts
+    │   │   ├── occupationMapController.loading.test.ts
+    │   │   └── wageMapController.test.ts
     │   ├── services/               # Service layer unit tests
+    │   │   ├── cacheService.test.ts
+    │   │   ├── occupationCacheService.test.ts
+    │   │   └── uiService.test.ts
     │   └── utils/                  # Utility function unit tests
+    │       ├── appInitializer.test.ts
+    │       └── errorHandler.test.ts
     ├── integration/                # Integration tests
+    ├── performance/                # Performance tests
+    │   └── occupationCache.test.ts
     ├── fixtures/                   # Test data and mock responses
+    │   └── apiResponses.ts
     ├── mocks/                      # External library mocks (Mapbox, jQuery)
+    │   ├── jquery.ts
+    │   └── mapbox-gl.ts
+    ├── utils/                      # Test utilities
+    │   ├── occupationTestHelpers.ts
+    │   └── testHelpers.ts
     └── setup.ts                    # Test environment configuration
 ```
 
@@ -91,7 +116,7 @@ src/
 - Both map controllers extend `BaseMapController` for shared functionality
 - Common methods: `initializeMapWithEmptySource()`, `updateExportLink()`, `showLoading()`, `clearMap()`
 - Subclasses implement specific logic: `loadOccupationIds()`, `setupDropdownListener()`
-- OccupationMapController includes caching methods: `getCachedOccupationIds()`, `cacheOccupationIds()`, `clearOccupationCache()`
+- Caching has been refactored into dedicated services (`occupationIdsCacheService`, `occupationCacheService`)
 
 #### Error Handling
 - Global error handlers for unhandled promises and general errors
@@ -113,7 +138,8 @@ src/
 
 ### Performance Optimizations
 - **Client-Side Caching**: 
-  - Occupation IDs cached in localStorage with 24-hour TTL
+  - Occupation IDs cached via dedicated `occupationIdsCacheService` with 24-hour TTL
+  - Generic caching infrastructure provided by `cacheService`
   - Automatic cache invalidation on expiry
   - Reduces API calls by ~99% for returning users
 - **Non-Blocking Loading**:
@@ -121,9 +147,10 @@ src/
   - Occupation IDs load asynchronously in background
   - Improved perceived performance and user experience
 - **Cache Management**:
-  - Keys: `occupation_ids_cache` and `occupation_ids_cache_time`
+  - Centralized cache services with consistent interfaces
+  - Support for different storage backends (localStorage, memory)
   - Graceful degradation if localStorage unavailable
-  - Manual cache clearing available via `clearOccupationCache()`
+  - Built-in error handling and recovery
 
 ### Styling Conventions
 - Uses consistent Dallas College branding (blue #003385 banner, red #E52626 buttons)
@@ -137,8 +164,9 @@ src/
 - **Vitest 3.2.3**: Fast testing framework with native ESM and TypeScript support
 - **Happy-DOM**: Lightweight browser environment simulation
 - **Testing Library**: DOM testing utilities with user-centric approach
-- **MSW**: Mock Service Worker for realistic API mocking
+- **MSW 2.10.2**: Mock Service Worker for realistic API mocking
 - **Coverage**: V8 coverage with 80% target threshold
+- **UI Testing**: Vitest UI interface available for interactive test debugging
 
 ### Test Commands
 ```bash

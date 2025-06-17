@@ -6,19 +6,19 @@ This document outlines the testing strategy for the Spatial Jobs Interface (SJI)
 
 ## Current Status
 
-- **Test Framework**: Vitest with happy-dom environment
-- **Total Tests**: 111 tests across 8 test files
-- **Current Pass Rate**: 111/111 (100%)
+- **Test Framework**: Vitest 3.2.3 with happy-dom environment
+- **Total Tests**: 111+ tests across multiple test files
+- **Current Pass Rate**: 100%
 - **Coverage Target**: 80% line coverage
 
 ## Testing Framework Architecture
 
 ### Core Technologies
 
-- **Test Runner**: Vitest 2.1.8 (fast, native ESM support)
-- **DOM Environment**: happy-dom (lightweight browser simulation)
-- **Mocking**: Custom mocks for external dependencies
-- **Coverage**: Istanbul with c8 reporter
+- **Test Runner**: Vitest 3.2.3 (fast, native ESM support)
+- **DOM Environment**: happy-dom 18.0.1 (lightweight browser simulation)
+- **Mocking**: Custom mocks for external dependencies + MSW 2.10.2
+- **Coverage**: V8 coverage reporter
 - **TypeScript**: Full type safety in tests
 
 ### Test Structure
