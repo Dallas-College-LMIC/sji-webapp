@@ -22,6 +22,8 @@ export interface DataLoadConfig {
     onError?: (error: Error) => void | Promise<void>;
     /** Whether to update export link after loading */
     updateExportLink?: boolean;
+    /** Abort signal for cancelling the request */
+    signal?: AbortSignal;
 }
 
 /**
@@ -34,6 +36,7 @@ export abstract class BaseMapController {
     protected apiService: ApiService;
     protected isInitialized: boolean;
     protected isLoading: boolean;
+    protected currentLoadController: AbortController | null;
 
     constructor(containerId: string, sourceId: string = 'map_data') {
         this.containerId = containerId;
@@ -42,12 +45,24 @@ export abstract class BaseMapController {
         this.apiService = new ApiService();
         this.isInitialized = false;
         this.isLoading = false;
+        this.currentLoadController = null;
     }
 
     /**
      * Initialize the map controller - to be implemented by subclasses
      */
     abstract initialize(): Promise<void>;
+
+    /**
+     * Cancel any ongoing data load requests
+     */
+    protected cancelCurrentLoad(): void {
+        if (this.currentLoadController) {
+            console.log('[BaseMapController] Cancelling current load request');
+            this.currentLoadController.abort();
+            this.currentLoadController = null;
+        }
+    }
 
     /**
      * Common map initialization with empty source
@@ -157,7 +172,8 @@ export abstract class BaseMapController {
             onBeforeLoad,
             onAfterLoad,
             onError,
-            updateExportLink = true
+            updateExportLink = true,
+            signal
         } = config;
 
         // Prevent concurrent loads
@@ -168,12 +184,28 @@ export abstract class BaseMapController {
 
         this.isLoading = true;
 
+        // Cancel any existing load
+        this.cancelCurrentLoad();
+
+        // Create new controller if no signal provided
+        let abortSignal = signal;
+        if (!signal) {
+            this.currentLoadController = this.apiService.createAbortController('base-map-load');
+            abortSignal = this.currentLoadController.signal;
+        }
+
         // Show loading state if element specified
         if (loadingElementId) {
             this.showLoading(loadingElementId, 'Loading map data...');
         }
 
         try {
+            // Check if already aborted
+            if (abortSignal?.aborted) {
+                console.log('[BaseMapController] Request already aborted');
+                return null;
+            }
+
             // Execute before load callback
             if (onBeforeLoad) {
                 await onBeforeLoad();
@@ -184,8 +216,8 @@ export abstract class BaseMapController {
                 this.clearMap();
             }
 
-            // Fetch data from API
-            const data = await this.apiService.getGeojsonData(params);
+            // Fetch data from API with abort signal
+            const data = await this.apiService.getGeojsonData(params, abortSignal);
             console.log('Fetched map data:', data);
 
             // Update map source with new data
@@ -205,6 +237,16 @@ export abstract class BaseMapController {
 
         } catch (error) {
             const err = error instanceof Error ? error : new Error(String(error));
+            
+            // Handle abort errors gracefully
+            if (err.name === 'AbortError') {
+                console.log('[BaseMapController] Request aborted');
+                if (loadingElementId) {
+                    this.hideLoading(loadingElementId);
+                }
+                return null;
+            }
+            
             ErrorHandler.logError(err, 'Data Loading', { 
                 params, 
                 sourceId: this.sourceId 
@@ -239,6 +281,11 @@ export abstract class BaseMapController {
 
         } finally {
             this.isLoading = false;
+            
+            // Clear current controller if it wasn't aborted
+            if (this.currentLoadController && !this.currentLoadController.signal.aborted) {
+                this.currentLoadController = null;
+            }
             
             // Hide loading state
             if (loadingElementId) {

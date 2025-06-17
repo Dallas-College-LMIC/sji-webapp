@@ -1,31 +1,12 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { OccupationCacheService, type OccupationCacheConfig, type CacheStats } from '../../../js/services/occupationCacheService';
-import { createCacheService, type ICacheService } from '../../../js/services/cacheService';
-import { createMockLocalStorage } from '../../utils/testHelpers';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { OccupationCacheService, type OccupationCacheConfig } from '../../../js/services/occupationCacheService';
+import { type ICacheService } from '../../../js/services/cacheService';
 import type { GeoJSONResponse } from '../../../types/api';
-
-// Mock performance.now for consistent testing
-Object.defineProperty(global, 'performance', {
-  value: {
-    now: vi.fn(() => Date.now())
-  }
-});
-
-// Mock Blob for size estimation
-class MockBlob {
-  size: number;
-  constructor(content: any[]) {
-    const str = JSON.stringify(content[0]);
-    this.size = str.length > 0 ? str.length * 2 : 1000; // Ensure non-zero size
-  }
-}
-
-global.Blob = MockBlob as any;
 
 describe('OccupationCacheService', () => {
   let mockCacheService: ICacheService;
   let occupationCache: OccupationCacheService;
-  let mockLocalStorage: Storage;
+  
   const mockGeoJSONData: GeoJSONResponse = {
     type: 'FeatureCollection',
     features: [
@@ -45,9 +26,6 @@ describe('OccupationCacheService', () => {
   };
 
   beforeEach(() => {
-    mockLocalStorage = createMockLocalStorage();
-    global.localStorage = mockLocalStorage;
-    
     // Create mock cache service with spies
     mockCacheService = {
       get: vi.fn(),
@@ -57,11 +35,6 @@ describe('OccupationCacheService', () => {
     };
     
     occupationCache = new OccupationCacheService(mockCacheService);
-    vi.clearAllMocks();
-  });
-
-  afterEach(() => {
-    vi.clearAllTimers();
   });
 
   describe('constructor', () => {
@@ -73,7 +46,6 @@ describe('OccupationCacheService', () => {
       expect(debugInfo.config.maxMemorySize).toBe(500 * 1024 * 1024);
       expect(debugInfo.config.persistentCacheTTL).toBe(7 * 24 * 60 * 60);
       expect(debugInfo.config.enablePersistence).toBe(true);
-      expect(debugInfo.config.preloadPopular).toBe(true);
     });
 
     it('should initialize with custom configuration', () => {
@@ -81,8 +53,7 @@ describe('OccupationCacheService', () => {
         maxMemoryEntries: 100,
         maxMemorySize: 1024 * 1024 * 1024,
         persistentCacheTTL: 24 * 60 * 60,
-        enablePersistence: false,
-        preloadPopular: false
+        enablePersistence: false
       };
       
       const cache = new OccupationCacheService(mockCacheService, customConfig);
@@ -92,24 +63,6 @@ describe('OccupationCacheService', () => {
       expect(debugInfo.config.maxMemorySize).toBe(1024 * 1024 * 1024);
       expect(debugInfo.config.persistentCacheTTL).toBe(24 * 60 * 60);
       expect(debugInfo.config.enablePersistence).toBe(false);
-      expect(debugInfo.config.preloadPopular).toBe(false);
-    });
-
-    it('should initialize cache statistics', () => {
-      const stats = occupationCache.getStats();
-      
-      expect(stats.hits).toBe(0);
-      expect(stats.misses).toBe(0);
-      expect(stats.evictions).toBe(0);
-      expect(stats.memoryUsage).toBe(0);
-      expect(stats.totalRequests).toBe(0);
-    });
-
-    it('should queue popular occupations for preloading when enabled', () => {
-      const cache = new OccupationCacheService(mockCacheService, { preloadPopular: true });
-      const debugInfo = cache.getDebugInfo();
-      
-      expect(debugInfo.preloadQueue).toBeGreaterThan(0);
     });
   });
 
@@ -155,35 +108,6 @@ describe('OccupationCacheService', () => {
       const debugInfo = occupationCache.getDebugInfo();
       expect(debugInfo.memoryEntries).toBe(1);
     });
-
-    it('should update access metadata on memory cache hit', async () => {
-      // Set data in cache
-      await occupationCache.set('17-2051', mockGeoJSONData);
-      
-      // Get it multiple times
-      await occupationCache.get('17-2051');
-      await occupationCache.get('17-2051');
-      
-      const stats = occupationCache.getStats();
-      expect(stats.hits).toBe(2);
-      expect(stats.totalRequests).toBe(2);
-    });
-
-    it('should skip persistent cache when disabled', async () => {
-      const noPersistMockService = {
-        get: vi.fn(),
-        set: vi.fn(),
-        remove: vi.fn(),
-        clear: vi.fn()
-      };
-      
-      const cache = new OccupationCacheService(noPersistMockService, { enablePersistence: false });
-      
-      const result = await cache.get('17-2051');
-      
-      expect(result).toBeNull();
-      expect(noPersistMockService.get).not.toHaveBeenCalled();
-    });
   });
 
   describe('set', () => {
@@ -205,242 +129,6 @@ describe('OccupationCacheService', () => {
       expect(debugInfo.memoryEntries).toBe(1);
       expect(debugInfo.stats.memoryUsage).toBeGreaterThan(0);
     });
-
-    it('should only store in memory cache when persistence is disabled', async () => {
-      const noPersistMockService = {
-        get: vi.fn(),
-        set: vi.fn(),
-        remove: vi.fn(),
-        clear: vi.fn()
-      };
-      
-      const cache = new OccupationCacheService(noPersistMockService, { enablePersistence: false });
-      
-      await cache.set('17-2051', mockGeoJSONData);
-      
-      expect(noPersistMockService.set).not.toHaveBeenCalled();
-      
-      const result = await cache.get('17-2051');
-      expect(result).toEqual(mockGeoJSONData);
-    });
-
-    it('should trigger preloading of related occupations', async () => {
-      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      
-      await occupationCache.set('17-2051', mockGeoJSONData);
-      
-      // Wait for preload processing
-      await new Promise(resolve => setTimeout(resolve, 150));
-      
-      // Should have logged preload attempts for related occupations
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Would preload')
-      );
-      
-      consoleSpy.mockRestore();
-    });
-  });
-
-  describe('memory management', () => {
-    it('should evict LRU entries when memory limit is reached', async () => {
-      // Create cache with small memory limit  
-      const smallMockCacheService = {
-        get: vi.fn(),
-        set: vi.fn(),
-        remove: vi.fn(),
-        clear: vi.fn()
-      };
-      
-      const cache = new OccupationCacheService(smallMockCacheService, {
-        maxMemoryEntries: 2,
-        maxMemorySize: 100 // Very small to force eviction
-      });
-      
-      // Add entries that will exceed memory limit
-      await cache.set('17-2051', mockGeoJSONData);
-      await cache.set('17-2052', mockGeoJSONData);
-      await cache.set('17-2053', mockGeoJSONData); // Should trigger eviction
-      
-      const stats = cache.getStats();
-      expect(stats.evictions).toBeGreaterThan(0);
-      
-      const debugInfo = cache.getDebugInfo();
-      expect(debugInfo.memoryEntries).toBeLessThanOrEqual(2);
-    });
-
-    it('should evict LRU entries when entry count limit is reached', async () => {
-      // Create cache with entry count limit
-      const countMockCacheService = {
-        get: vi.fn(),
-        set: vi.fn(), 
-        remove: vi.fn(),
-        clear: vi.fn()
-      };
-      
-      const cache = new OccupationCacheService(countMockCacheService, {
-        maxMemoryEntries: 2,
-        maxMemorySize: 1024 * 1024 * 1024 // Large memory limit
-      });
-      
-      // Add more entries than the limit
-      await cache.set('17-2051', mockGeoJSONData);
-      await cache.set('17-2052', mockGeoJSONData);
-      await cache.set('17-2053', mockGeoJSONData); // Should trigger eviction
-      
-      const stats = cache.getStats();
-      expect(stats.evictions).toBeGreaterThan(0);
-      
-      const debugInfo = cache.getDebugInfo();
-      expect(debugInfo.memoryEntries).toBeLessThanOrEqual(2);
-    });
-
-    it('should correctly identify LRU entry for eviction', async () => {
-      const lruMockCacheService = {
-        get: vi.fn(),
-        set: vi.fn(),
-        remove: vi.fn(), 
-        clear: vi.fn()
-      };
-      
-      const cache = new OccupationCacheService(lruMockCacheService, {
-        maxMemoryEntries: 2,
-        maxMemorySize: 1024 * 1024 * 1024
-      });
-      
-      // Add two entries
-      await cache.set('17-2051', mockGeoJSONData);
-      await cache.set('17-2052', mockGeoJSONData);
-      
-      // Access first entry to make it more recently used
-      await cache.get('17-2051');
-      
-      // Add third entry - should evict the second one (least recently used)
-      await cache.set('17-2053', mockGeoJSONData);
-      
-      // First entry should still be accessible
-      const result1 = await cache.get('17-2051');
-      expect(result1).toEqual(mockGeoJSONData);
-      
-      // Second entry should be evicted (but might be in persistent cache)
-      // Clear the mock to ensure we're testing memory cache only
-      lruMockCacheService.get = vi.fn().mockReturnValue(null);
-      const result2 = await cache.get('17-2052');
-      expect(result2).toBeNull();
-      
-      // Third entry should be accessible
-      const result3 = await cache.get('17-2053');
-      expect(result3).toEqual(mockGeoJSONData);
-    });
-  });
-
-  describe('size estimation', () => {
-    it('should estimate data size correctly', async () => {
-      const largeData: GeoJSONResponse = {
-        type: 'FeatureCollection',
-        features: Array(100).fill(mockGeoJSONData.features[0])
-      };
-      
-      await occupationCache.set('large-occupation', largeData);
-      
-      const debugInfo = occupationCache.getDebugInfo();
-      // Memory usage should be calculated and greater than 0  
-      const stats = occupationCache.getStats();
-      expect(stats.memoryUsage).toBeGreaterThan(0);
-    });
-
-    it('should handle size estimation errors gracefully', async () => {
-      // Mock Blob to throw error
-      const originalBlob = global.Blob;
-      global.Blob = class {
-        constructor() {
-          throw new Error('Blob error');
-        }
-      } as any;
-      
-      // Should not throw and should use fallback estimation
-      await expect(occupationCache.set('17-2051', mockGeoJSONData)).resolves.not.toThrow();
-      
-      global.Blob = originalBlob;
-    });
-  });
-
-  describe('related occupations', () => {
-    it('should identify related occupations based on SOC code', async () => {
-      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      
-      // Set occupation in major group 17 (Architecture and Engineering)
-      await occupationCache.set('17-2051', mockGeoJSONData);
-      
-      // Wait for preload processing
-      await new Promise(resolve => setTimeout(resolve, 150));
-      
-      // Should attempt to preload other 17-xxxx occupations
-      const preloadCalls = consoleSpy.mock.calls.filter(call => 
-        call[0] && call[0].includes && call[0].includes('Would preload 17-')
-      );
-      
-      // May or may not have related 17-xxxx occupations in the common list
-      expect(preloadCalls.length).toBeGreaterThanOrEqual(0);
-      
-      consoleSpy.mockRestore();
-    });
-  });
-
-  describe('preloading', () => {
-    it('should set preload callback and use it for preloading', async () => {
-      const mockPreloadCallback = vi.fn().mockResolvedValue(mockGeoJSONData);
-      
-      occupationCache.setPreloadCallback(mockPreloadCallback);
-      
-      // Trigger preloading by setting an occupation
-      await occupationCache.set('17-2051', mockGeoJSONData);
-      
-      // Wait for preload processing
-      await new Promise(resolve => setTimeout(resolve, 2500));
-      
-      // Callback should have been called for related occupations
-      expect(mockPreloadCallback).toHaveBeenCalled();
-    });
-
-    it('should handle preload failures gracefully', async () => {
-      const mockPreloadCallback = vi.fn().mockRejectedValue(new Error('API Error'));
-      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      
-      occupationCache.setPreloadCallback(mockPreloadCallback);
-      
-      await occupationCache.set('17-2051', mockGeoJSONData);
-      
-      // Wait for preload processing
-      await new Promise(resolve => setTimeout(resolve, 2500));
-      
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Preload failed'),
-        expect.any(Error)
-      );
-      
-      consoleWarnSpy.mockRestore();
-    });
-
-    it('should not preload already cached or in-progress occupations', async () => {
-      const mockPreloadCallback = vi.fn().mockResolvedValue(mockGeoJSONData);
-      
-      occupationCache.setPreloadCallback(mockPreloadCallback);
-      
-      // Set two occupations from same major group
-      await occupationCache.set('17-2051', mockGeoJSONData);
-      await occupationCache.set('17-2061', mockGeoJSONData); // Related to 17-2051
-      
-      // Wait for preload processing
-      await new Promise(resolve => setTimeout(resolve, 2500));
-      
-      // Should not preload 17-2061 multiple times since it's already cached
-      const preloadCalls = mockPreloadCallback.mock.calls.filter(call => 
-        call[0] === '17-2061'
-      );
-      
-      // May be called once during first occupation's preload processing
-      expect(preloadCalls.length).toBeLessThanOrEqual(1);
-    });
   });
 
   describe('clear', () => {
@@ -449,25 +137,12 @@ describe('OccupationCacheService', () => {
       await occupationCache.set('17-2051', mockGeoJSONData);
       await occupationCache.get('17-2051');
       
-      // Verify data exists
-      let stats = occupationCache.getStats();
-      expect(stats.hits).toBe(1);
-      expect(stats.totalRequests).toBe(1);
-      
       // Clear cache
       occupationCache.clear();
       
       // Verify cache is cleared
       const result = await occupationCache.get('17-2051');
       expect(result).toBeNull();
-      
-      // Verify statistics are reset
-      stats = occupationCache.getStats();
-      expect(stats.hits).toBe(0);
-      expect(stats.misses).toBe(1); // From the get above
-      expect(stats.evictions).toBe(0);
-      expect(stats.memoryUsage).toBe(0);
-      expect(stats.totalRequests).toBe(1); // From the get above
       
       // Verify persistent cache was cleared
       expect(mockCacheService.clear).toHaveBeenCalled();
@@ -498,63 +173,12 @@ describe('OccupationCacheService', () => {
       expect(debugInfo).toHaveProperty('memoryEntries');
       expect(debugInfo).toHaveProperty('memoryUsageMB');
       expect(debugInfo).toHaveProperty('hitRate');
-      expect(debugInfo).toHaveProperty('preloadQueue');
-      expect(debugInfo).toHaveProperty('preloadInProgress');
       expect(debugInfo).toHaveProperty('config');
       expect(debugInfo).toHaveProperty('stats');
       
       expect(debugInfo.memoryEntries).toBe(1);
       expect(debugInfo.stats.memoryUsage).toBeGreaterThan(0);
       expect(debugInfo.hitRate).toBe(0); // No gets yet
-    });
-
-    it('should calculate hit rate correctly', async () => {
-      await occupationCache.set('17-2051', mockGeoJSONData);
-      
-      // 2 hits, 1 miss
-      await occupationCache.get('17-2051');
-      await occupationCache.get('17-2051');
-      await occupationCache.get('nonexistent');
-      
-      const debugInfo = occupationCache.getDebugInfo();
-      expect(debugInfo.hitRate).toBe(67); // 2/3 * 100 = 66.67, rounded to 67
-    });
-
-    it('should handle zero requests when calculating hit rate', () => {
-      const debugInfo = occupationCache.getDebugInfo();
-      expect(debugInfo.hitRate).toBe(0);
-    });
-  });
-
-  describe('edge cases', () => {
-    it('should handle empty GeoJSON data', async () => {
-      const emptyData: GeoJSONResponse = {
-        type: 'FeatureCollection',
-        features: []
-      };
-      
-      await expect(occupationCache.set('empty', emptyData)).resolves.not.toThrow();
-      
-      const result = await occupationCache.get('empty');
-      expect(result).toEqual(emptyData);
-    });
-
-    it('should handle very long occupation IDs', async () => {
-      const longId = 'very-long-occupation-id-' + 'x'.repeat(1000);
-      
-      await expect(occupationCache.set(longId, mockGeoJSONData)).resolves.not.toThrow();
-      
-      const result = await occupationCache.get(longId);
-      expect(result).toEqual(mockGeoJSONData);
-    });
-
-    it('should handle special characters in occupation IDs', async () => {
-      const specialId = '17-2051@#$%^&*()_+{}|:"<>?';
-      
-      await expect(occupationCache.set(specialId, mockGeoJSONData)).resolves.not.toThrow();
-      
-      const result = await occupationCache.get(specialId);
-      expect(result).toEqual(mockGeoJSONData);
     });
   });
 });

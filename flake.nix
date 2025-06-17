@@ -16,6 +16,7 @@
           buildInputs = with pkgs; [
             nodejs
             nodePackages.npm
+	    uv
           ];
 
           shellHook = ''

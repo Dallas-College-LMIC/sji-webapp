@@ -22,6 +22,7 @@ export class ApiService {
     private requestInterceptors: RequestInterceptor[] = [];
     private responseInterceptors: ResponseInterceptor[] = [];
     private activeRequests = new Map<string, AbortController>();
+    private namedControllers = new Map<string, AbortController>();
 
     constructor() {
         this.baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
@@ -89,10 +90,30 @@ export class ApiService {
         
         for (let attempt = 0; attempt <= retries!; attempt++) {
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), timeout!);
+            let timeoutId: NodeJS.Timeout | undefined;
+            
+            // Only set timeout if timeout is defined and greater than 0
+            if (timeout && timeout > 0) {
+                timeoutId = setTimeout(() => controller.abort(), timeout);
+            }
+            
+            // If an external signal is provided, link it to our controller
+            if (options.signal) {
+                const externalSignal = options.signal;
+                if (externalSignal.aborted) {
+                    if (timeoutId) clearTimeout(timeoutId);
+                    throw new DOMException('The operation was aborted', 'AbortError');
+                }
+                
+                const abortHandler = () => {
+                    controller.abort();
+                    if (timeoutId) clearTimeout(timeoutId);
+                };
+                externalSignal.addEventListener('abort', abortHandler);
+            }
             
             // Store active request for potential cancellation
-            const requestKey = `${options.method || 'GET'}-${url}`;
+            const requestKey = `${options.method || 'GET'}-${url}-${Date.now()}`;
             this.activeRequests.set(requestKey, controller);
             
             try {
@@ -105,21 +126,30 @@ export class ApiService {
                     }
                 });
                 
-                clearTimeout(timeoutId);
+                if (timeoutId) clearTimeout(timeoutId);
                 this.activeRequests.delete(requestKey);
                 
                 // Apply response interceptors
                 return await this.applyResponseInterceptors(response);
                 
             } catch (error) {
-                clearTimeout(timeoutId);
+                if (timeoutId) clearTimeout(timeoutId);
                 this.activeRequests.delete(requestKey);
                 
                 lastError = error as Error;
                 
                 // Check if error is abort (timeout or manual cancellation)
                 if (error instanceof Error && error.name === 'AbortError') {
-                    throw new Error(`Request timeout after ${timeout}ms`);
+                    // If aborted by external signal, don't retry
+                    if (options.signal?.aborted) {
+                        console.log(`[ApiService] Request aborted by external signal: ${url}`);
+                        throw error;
+                    }
+                    // Otherwise it's a timeout (only if timeout was set)
+                    if (timeout && timeout > 0) {
+                        throw new Error(`Request timeout after ${timeout}ms`);
+                    }
+                    throw error;
                 }
                 
                 // If it's the last attempt, throw the error
@@ -128,7 +158,7 @@ export class ApiService {
                 }
                 
                 // Log retry attempt
-                console.warn(`Retry attempt ${attempt + 1}/${retries} after ${retryDelay}ms delay`);
+                console.warn(`[ApiService] Retry attempt ${attempt + 1}/${retries} after ${retryDelay}ms delay`);
                 
                 // Wait before retrying with exponential backoff
                 await new Promise(resolve => setTimeout(resolve, retryDelay! * Math.pow(2, attempt)));
@@ -142,17 +172,76 @@ export class ApiService {
      * Cancel all active requests
      */
     cancelAllRequests(): void {
-        this.activeRequests.forEach((controller, key) => {
-            controller.abort();
-            console.log(`Cancelled request: ${key}`);
+        const activeCount = this.activeRequests.size;
+        const namedCount = this.namedControllers.size;
+        
+        if (activeCount > 0) {
+            console.log(`[ApiService] Cancelling ${activeCount} active requests`);
+            this.activeRequests.forEach((controller, key) => {
+                controller.abort();
+                console.log(`[ApiService] Cancelled request: ${key}`);
+            });
+            this.activeRequests.clear();
+        }
+        
+        if (namedCount > 0) {
+            console.log(`[ApiService] Cancelling ${namedCount} named controllers`);
+            this.namedControllers.forEach((controller, name) => {
+                controller.abort();
+                console.log(`[ApiService] Cancelled named controller: ${name}`);
+            });
+            this.namedControllers.clear();
+        }
+    }
+
+    /**
+     * Create a named AbortController that can be reused across multiple requests
+     * If a controller with the same name exists, it will be aborted first
+     */
+    createAbortController(name: string): AbortController {
+        // Cancel existing controller with same name if it exists
+        const existing = this.namedControllers.get(name);
+        if (existing) {
+            console.log(`[ApiService] Aborting existing controller: ${name}`);
+            existing.abort();
+        }
+        
+        const controller = new AbortController();
+        this.namedControllers.set(name, controller);
+        
+        // Clean up when aborted
+        controller.signal.addEventListener('abort', () => {
+            this.namedControllers.delete(name);
         });
-        this.activeRequests.clear();
+        
+        return controller;
+    }
+
+    /**
+     * Get an existing named AbortController
+     */
+    getAbortController(name: string): AbortController | undefined {
+        return this.namedControllers.get(name);
+    }
+
+    /**
+     * Cancel a specific named request
+     */
+    cancelRequest(name: string): boolean {
+        const controller = this.namedControllers.get(name);
+        if (controller) {
+            console.log(`[ApiService] Cancelling named request: ${name}`);
+            controller.abort();
+            this.namedControllers.delete(name);
+            return true;
+        }
+        return false;
     }
 
     /**
      * Enhanced fetch method with better error handling
      */
-    async fetchData<T>(endpoint: string, config: RequestConfig = {}): Promise<T> {
+    async fetchData<T>(endpoint: string, config: RequestConfig = {}, signal?: AbortSignal): Promise<T> {
         const url = `${this.baseUrl}${endpoint}`;
         
         try {
@@ -161,6 +250,7 @@ export class ApiService {
             
             const response = await this.fetchWithRetry(url, {
                 method: 'GET',
+                signal,
             }, finalConfig);
 
             if (!response.ok) {
@@ -179,7 +269,12 @@ export class ApiService {
 
             return await response.json() as T;
         } catch (error) {
-            console.error(`Error fetching data from ${endpoint}:`, error);
+            // Don't log abort errors as errors - they're expected
+            if (error instanceof Error && error.name === 'AbortError') {
+                console.log(`[ApiService] Request cancelled for ${endpoint}`);
+            } else {
+                console.error(`[ApiService] Error fetching data from ${endpoint}:`, error);
+            }
             
             // Enhance error with more context
             if (error instanceof Error) {
@@ -191,22 +286,25 @@ export class ApiService {
         }
     }
 
-    async getGeojsonData(params: Record<string, string> = {}): Promise<GeoJSONResponse> {
+    async getGeojsonData(params: Record<string, string> = {}, signal?: AbortSignal): Promise<GeoJSONResponse> {
         const queryString = new URLSearchParams(params).toString();
         const endpoint = queryString ? `/geojson?${queryString}` : '/geojson';
-        return this.fetchData<GeoJSONResponse>(endpoint);
+        return this.fetchData<GeoJSONResponse>(endpoint, {}, signal);
     }
 
-    async getOccupationIds(): Promise<OccupationIdsResponse> {
+    async getOccupationIds(signal?: AbortSignal): Promise<OccupationIdsResponse> {
         // Occupation IDs are cached, so we can be more aggressive with retries
         return this.fetchData<OccupationIdsResponse>('/occupation_ids', {
             retries: 5,
-            timeout: 60000 // 1 minute for initial load
-        });
+            timeout: undefined // No timeout - let the request complete
+        }, signal);
     }
 
-    async getOccupationData(occupationId: string): Promise<GeoJSONResponse> {
-        return this.fetchData<GeoJSONResponse>(`/occupation_data/${occupationId}`);
+    async getOccupationData(occupationId: string, signal?: AbortSignal): Promise<GeoJSONResponse> {
+        console.log(`[ApiService] Fetching occupation data for: ${occupationId}`);
+        return this.fetchData<GeoJSONResponse>(`/occupation_data/${occupationId}`, {
+            timeout: undefined // No timeout - let the request complete
+        }, signal);
     }
 
     getExportUrl(params: Record<string, string> = {}): string {

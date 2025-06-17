@@ -10,6 +10,8 @@ export class OccupationMapController extends BaseMapController {
     private readonly CACHE_KEY = 'occupation_ids';
     private readonly CACHE_TTL = 24 * 60 * 60; // 24 hours in seconds
     private activeRequests = new Map<string, Promise<void>>(); // Request deduplication
+    private currentOccupationId: string | null = null; // Track current occupation
+    private currentAbortController: AbortController | null = null; // Track current request abort controller
 
     constructor(containerId: string) {
         super(containerId, 'occupation_data');
@@ -20,13 +22,7 @@ export class OccupationMapController extends BaseMapController {
             maxMemoryEntries: 50,
             maxMemorySize: 500 * 1024 * 1024, // 500MB
             persistentCacheTTL: 7 * 24 * 60 * 60, // 7 days
-            enablePersistence: true,
-            preloadPopular: true
-        });
-        
-        // Set up preloading callback
-        this.occupationCache.setPreloadCallback(async (occupationId: string) => {
-            return await this.apiService.getOccupationData(occupationId);
+            enablePersistence: true
         });
         
         this.migrateOldCache();
@@ -64,8 +60,11 @@ export class OccupationMapController extends BaseMapController {
                 return;
             }
             
+            // Create abort controller for this request
+            const controller = this.apiService.createAbortController('occupation-ids');
+            
             // Fetch from API if not cached
-            const response = await this.apiService.getOccupationIds();
+            const response = await this.apiService.getOccupationIds(controller.signal);
             console.log("Loaded occupation IDs response:", response);
             
             // Handle new API structure - extract occupation_ids array from response
@@ -79,13 +78,20 @@ export class OccupationMapController extends BaseMapController {
             this.hideLoading('loading');
         } catch (error) {
             const err = error instanceof Error ? error : new Error(String(error));
-            ErrorHandler.logError(err, 'Load Occupation IDs');
-            this.showError('loading', 'Error loading occupations');
-            uiService.showNotification({
-                type: 'error',
-                message: 'Failed to load occupation list. Please refresh the page to try again.',
-                duration: 10000
-            });
+            
+            // Don't show error notification for abort errors
+            if (err.name !== 'AbortError') {
+                ErrorHandler.logError(err, 'Load Occupation IDs');
+                this.showError('loading', 'Error loading occupations');
+                uiService.showNotification({
+                    type: 'error',
+                    message: 'Failed to load occupation list. Please refresh the page to try again.',
+                    duration: 10000
+                });
+            } else {
+                this.hideLoading('loading');
+                console.log('[OccupationController] Occupation IDs loading was cancelled');
+            }
         }
     }
     
@@ -126,6 +132,20 @@ export class OccupationMapController extends BaseMapController {
     }
     
     private async loadOccupationData(occupationId: string): Promise<void> {
+        // Skip if already loading the same occupation
+        if (this.currentOccupationId === occupationId) {
+            console.log(`[OccupationController] Already showing occupation: ${occupationId}`);
+            return;
+        }
+        
+        // Cancel any existing occupation data request
+        if (this.currentAbortController) {
+            console.log(`[OccupationController] Cancelling previous occupation data request`);
+            this.currentAbortController.abort();
+            this.currentAbortController = null;
+        }
+        
+        
         // Check if request is already in progress
         if (this.activeRequests.has(occupationId)) {
             console.log(`[OccupationController] Request already in progress for ${occupationId}, waiting...`);
@@ -133,19 +153,28 @@ export class OccupationMapController extends BaseMapController {
             return;
         }
 
+        // Create new abort controller for this request
+        this.currentAbortController = this.apiService.createAbortController(`occupation-data-${occupationId}`);
+
         // Create new request and store it
-        const requestPromise = this.loadOccupationDataDirect(occupationId);
+        const requestPromise = this.loadOccupationDataDirect(occupationId, this.currentAbortController.signal);
         this.activeRequests.set(occupationId, requestPromise);
 
         try {
             await requestPromise;
+            // Update current occupation on success
+            this.currentOccupationId = occupationId;
         } finally {
             // Clean up the request tracker
             this.activeRequests.delete(occupationId);
+            // Clear abort controller if it's the same one
+            if (this.currentAbortController?.signal.aborted === false) {
+                this.currentAbortController = null;
+            }
         }
     }
 
-    private async loadOccupationDataDirect(occupationId: string): Promise<void> {
+    private async loadOccupationDataDirect(occupationId: string, signal?: AbortSignal): Promise<void> {
         // Prevent concurrent loads
         if (this.isDataLoading()) {
             console.warn('Data load already in progress');
@@ -156,6 +185,12 @@ export class OccupationMapController extends BaseMapController {
         let cacheHit = false;
 
         try {
+            // Check if already aborted
+            if (signal?.aborted) {
+                console.log(`[OccupationController] Request already aborted for ${occupationId}`);
+                return;
+            }
+
             // Check cache first
             let data = await this.occupationCache.get(occupationId);
             
@@ -173,11 +208,13 @@ export class OccupationMapController extends BaseMapController {
                 });
                 console.log(`[OccupationController] Cache miss for ${occupationId}, fetching from API`);
                 
-                // Fetch from API
-                data = await this.apiService.getOccupationData(occupationId);
+                // Fetch from API with abort signal
+                data = await this.apiService.getOccupationData(occupationId, signal);
                 
-                // Store in cache for future use
-                await this.occupationCache.set(occupationId, data);
+                // Store in cache for future use (only if not aborted)
+                if (!signal?.aborted) {
+                    await this.occupationCache.set(occupationId, data);
+                }
             }
 
             // Update map source with data
@@ -216,6 +253,14 @@ export class OccupationMapController extends BaseMapController {
 
         } catch (error) {
             const err = error instanceof Error ? error : new Error(String(error));
+            
+            // Handle abort errors gracefully
+            if (err.name === 'AbortError') {
+                console.log(`[OccupationController] Request aborted for ${occupationId}`);
+                uiService.hideLoading('loading');
+                return;
+            }
+            
             ErrorHandler.logError(err, 'Load Occupation Data', { occupationId });
             this.showError('loading', 'Error loading occupation data');
             uiService.showNotification({
@@ -240,6 +285,7 @@ export class OccupationMapController extends BaseMapController {
     
     protected clearMap(): void {
         super.clearMap();
+        this.currentOccupationId = null;
     }
 
     protected getLayerIds(): string[] {
@@ -258,7 +304,9 @@ export class OccupationMapController extends BaseMapController {
      */
     clearAllCaches(): void {
         this.clearOccupationCache();
-        this.occupationCache.clear();
+        if (typeof this.occupationCache.clear === 'function') {
+            this.occupationCache.clear();
+        }
         console.log('[OccupationController] All caches cleared');
     }
     

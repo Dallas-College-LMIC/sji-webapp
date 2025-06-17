@@ -11,6 +11,7 @@ export const mockMap = {
   once: vi.fn(),
   addControl: vi.fn(),
   removeControl: vi.fn(),
+  isStyleLoaded: vi.fn(() => true),
   addSource: vi.fn(),
   removeSource: vi.fn(),
   getSource: vi.fn(),
@@ -48,17 +49,25 @@ export const mockPopup = {
 export const mockNavigationControl = vi.fn();
 export const mockFullscreenControl = vi.fn();
 
+// Mock Map constructor to return our mockMap
+const MockMap = vi.fn().mockImplementation(() => mockMap);
+
 // Create the mock mapboxgl object
 export const mapboxgl = {
-  Map: vi.fn(() => mockMap),
-  Popup: vi.fn(() => mockPopup),
-  NavigationControl: mockNavigationControl,
-  FullscreenControl: mockFullscreenControl,
+  Map: MockMap,
+  Popup: vi.fn().mockImplementation(() => mockPopup),
+  NavigationControl: vi.fn().mockImplementation(() => ({})),
+  FullscreenControl: vi.fn().mockImplementation(() => ({})),
   accessToken: '',
   supported: vi.fn(() => true),
   LngLat: vi.fn((lng: number, lat: number) => ({ lng, lat })),
   LngLatBounds: vi.fn(),
 };
 
-// Make it available globally
-(globalThis as any).mapboxgl = mapboxgl;
+// Make it available globally before any imports
+if (!(globalThis as any).mapboxgl) {
+  (globalThis as any).mapboxgl = mapboxgl;
+}
+
+// Also export for direct use
+export default mapboxgl;

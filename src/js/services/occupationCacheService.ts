@@ -30,7 +30,6 @@ export interface OccupationCacheConfig {
     maxMemorySize: number; // in bytes
     persistentCacheTTL: number; // in seconds
     enablePersistence: boolean;
-    preloadPopular: boolean;
 }
 
 /**
@@ -41,8 +40,6 @@ export class OccupationCacheService {
     private persistentCache: ICacheService;
     private config: OccupationCacheConfig;
     private stats: CacheStats;
-    private preloadQueue: string[] = [];
-    private preloadInProgress = new Set<string>();
 
     constructor(persistentCache: ICacheService, config: Partial<OccupationCacheConfig> = {}) {
         this.persistentCache = persistentCache;
@@ -51,7 +48,6 @@ export class OccupationCacheService {
             maxMemorySize: 500 * 1024 * 1024, // 500MB
             persistentCacheTTL: 7 * 24 * 60 * 60, // 7 days
             enablePersistence: true,
-            preloadPopular: true,
             ...config
         };
         
@@ -62,11 +58,6 @@ export class OccupationCacheService {
             memoryUsage: 0,
             totalRequests: 0
         };
-
-        // Initialize popular occupations for preloading
-        if (this.config.preloadPopular) {
-            this.initializePopularOccupations();
-        }
     }
 
     /**
@@ -116,9 +107,6 @@ export class OccupationCacheService {
         if (this.config.enablePersistence) {
             this.persistentCache.set(`occupation_${occupationId}`, data, this.config.persistentCacheTTL);
         }
-
-        // Track usage for smart preloading
-        this.trackUsage(occupationId);
     }
 
     /**
@@ -203,122 +191,6 @@ export class OccupationCacheService {
     }
 
     /**
-     * Track occupation usage for smart preloading
-     */
-    private trackUsage(occupationId: string): void {
-        // Add related occupations to preload queue
-        const relatedOccupations = this.getRelatedOccupations(occupationId);
-        
-        relatedOccupations.forEach(related => {
-            if (!this.memoryCache.has(related) && 
-                !this.preloadInProgress.has(related) && 
-                !this.preloadQueue.includes(related)) {
-                this.preloadQueue.push(related);
-            }
-        });
-
-        // Trigger background preloading
-        this.processPreloadQueue();
-    }
-
-    /**
-     * Get related occupations based on SOC code patterns
-     */
-    private getRelatedOccupations(occupationId: string): string[] {
-        // Same SOC major group (first 2 digits)
-        const majorGroup = occupationId.substring(0, 2);
-        
-        // This would be populated with actual occupation data
-        // For now, we'll return a few common patterns
-        const commonOccupations = [
-            '11-1011', '11-3011', '15-1132', '15-1134', '17-2051', 
-            '17-2061', '25-1011', '29-1141', '41-3031', '43-4051'
-        ];
-        
-        return commonOccupations.filter(id => 
-            id.startsWith(majorGroup) && id !== occupationId
-        ).slice(0, 3);
-    }
-
-    /**
-     * Process the preload queue in background
-     */
-    private async processPreloadQueue(): Promise<void> {
-        if (this.preloadQueue.length === 0) return;
-
-        const occupationId = this.preloadQueue.shift();
-        if (!occupationId || this.preloadInProgress.has(occupationId)) return;
-
-        this.preloadInProgress.add(occupationId);
-
-        try {
-            // This would be injected as a callback
-            // For now, we'll just mark it as processed
-            console.log(`[OccupationCache] Would preload ${occupationId}`);
-            
-            // Simulate async operation
-            await new Promise(resolve => setTimeout(resolve, 100));
-            
-        } catch (error) {
-            console.warn(`[OccupationCache] Preload failed for ${occupationId}:`, error);
-        } finally {
-            this.preloadInProgress.delete(occupationId);
-            
-            // Continue processing queue
-            if (this.preloadQueue.length > 0) {
-                setTimeout(() => this.processPreloadQueue(), 1000);
-            }
-        }
-    }
-
-    /**
-     * Initialize popular occupations for preloading
-     */
-    private initializePopularOccupations(): void {
-        const popularOccupations = [
-            '11-1011', // Chief Executives
-            '15-1132', // Software Developers
-            '25-1011', // Business Teachers
-            '29-1141', // Registered Nurses
-            '41-3031', // Securities Sales Agents
-            '43-4051', // Customer Service Representatives
-            '47-2031', // Carpenters
-            '53-3032'  // Heavy Truck Drivers
-        ];
-
-        this.preloadQueue.push(...popularOccupations);
-    }
-
-    /**
-     * Set preload callback for fetching data
-     */
-    setPreloadCallback(callback: (occupationId: string) => Promise<GeoJSONResponse>): void {
-        this.processPreloadQueue = async () => {
-            if (this.preloadQueue.length === 0) return;
-
-            const occupationId = this.preloadQueue.shift();
-            if (!occupationId || this.preloadInProgress.has(occupationId)) return;
-
-            this.preloadInProgress.add(occupationId);
-
-            try {
-                const data = await callback(occupationId);
-                await this.set(occupationId, data);
-                console.log(`[OccupationCache] Preloaded ${occupationId}`);
-            } catch (error) {
-                console.warn(`[OccupationCache] Preload failed for ${occupationId}:`, error);
-            } finally {
-                this.preloadInProgress.delete(occupationId);
-                
-                // Continue processing queue with delay
-                if (this.preloadQueue.length > 0) {
-                    setTimeout(() => this.processPreloadQueue(), 2000);
-                }
-            }
-        };
-    }
-
-    /**
      * Get cache statistics
      */
     getStats(): CacheStats {
@@ -349,8 +221,6 @@ export class OccupationCacheService {
             memoryUsageMB: Math.round(this.stats.memoryUsage / (1024 * 1024)),
             hitRate: this.stats.totalRequests > 0 ? 
                 Math.round((this.stats.hits / this.stats.totalRequests) * 100) : 0,
-            preloadQueue: this.preloadQueue.length,
-            preloadInProgress: this.preloadInProgress.size,
             config: this.config,
             stats: this.stats
         };

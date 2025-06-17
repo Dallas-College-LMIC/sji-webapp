@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "/home/ammar/Documents/projects/work/sji-webapp/logs/.748506ac7552d769ae34bbe76187557341d5b00a-audit.json",
+    "files": [
+        {
+            "date": 1750184429309,
+            "name": "/home/ammar/Documents/projects/work/sji-webapp/logs/mcp-puppeteer-2025-06-17.log",
+            "hash": "26b6fbf46566b135a9c0c0f7443385b6507718c45e2d1af4bf444ea7e08a7483"
+        }
+    ],
+    "hashType": "sha256"
+}
