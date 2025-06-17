@@ -1,18 +1,34 @@
 import { BaseMapController } from './controllers/baseMapController';
 import { createCacheService, ICacheService } from './services/cacheService';
+import { OccupationCacheService } from './services/occupationCacheService';
 import { uiService } from './services/uiService';
 import { ErrorHandler } from './utils/errorHandler';
 
 export class OccupationMapController extends BaseMapController {
-    private currentOccupationId: string | null; // Used to track the currently selected occupation
     private cacheService: ICacheService;
+    private occupationCache: OccupationCacheService;
     private readonly CACHE_KEY = 'occupation_ids';
     private readonly CACHE_TTL = 24 * 60 * 60; // 24 hours in seconds
+    private activeRequests = new Map<string, Promise<void>>(); // Request deduplication
 
     constructor(containerId: string) {
         super(containerId, 'occupation_data');
-        this.currentOccupationId = null;
         this.cacheService = createCacheService('localStorage', 'sji_webapp');
+        
+        // Initialize high-performance occupation data cache
+        this.occupationCache = new OccupationCacheService(this.cacheService, {
+            maxMemoryEntries: 50,
+            maxMemorySize: 500 * 1024 * 1024, // 500MB
+            persistentCacheTTL: 7 * 24 * 60 * 60, // 7 days
+            enablePersistence: true,
+            preloadPopular: true
+        });
+        
+        // Set up preloading callback
+        this.occupationCache.setPreloadCallback(async (occupationId: string) => {
+            return await this.apiService.getOccupationData(occupationId);
+        });
+        
         this.migrateOldCache();
         this.initialize();
     }
@@ -105,35 +121,120 @@ export class OccupationMapController extends BaseMapController {
     }
     
     private async loadOccupationData(occupationId: string): Promise<void> {
-        this.currentOccupationId = occupationId;
-        
-        // Generate property names using base class method
-        const properties = this.generatePropertyNames(`occupation_${occupationId}`);
-        
-        // Use base class loadData method
-        await this.loadData({
-            params: { occupation_id: occupationId },
-            clearBeforeLoad: false,
-            onAfterLoad: () => {
-                // Add or update the occupation layer using base class method
-                this.addOrUpdateLayer(
-                    'occupation-layer',
-                    this.sourceId,
-                    properties.zscore_cat,
-                    'visible',
-                    `Occupation: ${occupationId}`,
-                    properties.zscore
-                );
+        // Check if request is already in progress
+        if (this.activeRequests.has(occupationId)) {
+            console.log(`[OccupationController] Request already in progress for ${occupationId}, waiting...`);
+            await this.activeRequests.get(occupationId);
+            return;
+        }
+
+        // Create new request and store it
+        const requestPromise = this.loadOccupationDataDirect(occupationId);
+        this.activeRequests.set(occupationId, requestPromise);
+
+        try {
+            await requestPromise;
+        } finally {
+            // Clean up the request tracker
+            this.activeRequests.delete(occupationId);
+        }
+    }
+
+    private async loadOccupationDataDirect(occupationId: string): Promise<void> {
+        // Prevent concurrent loads
+        if (this.isDataLoading()) {
+            console.warn('Data load already in progress');
+            return;
+        }
+
+        const startTime = performance.now();
+        let cacheHit = false;
+
+        try {
+            // Check cache first
+            let data = await this.occupationCache.get(occupationId);
+            
+            if (data) {
+                cacheHit = true;
+                uiService.showLoading('loading', { 
+                    message: 'Loading from cache...', 
+                    showSpinner: true 
+                });
+                console.log(`[OccupationController] Cache hit for ${occupationId}`);
+            } else {
+                uiService.showLoading('loading', { 
+                    message: 'Fetching occupation data...', 
+                    showSpinner: true 
+                });
+                console.log(`[OccupationController] Cache miss for ${occupationId}, fetching from API`);
                 
-                // Update export link with current occupation
-                this.updateExportLink({ occupation_id: this.currentOccupationId! });
+                // Fetch from API
+                data = await this.apiService.getOccupationData(occupationId);
+                
+                // Store in cache for future use
+                await this.occupationCache.set(occupationId, data);
             }
-        });
+
+            // Update map source with data
+            this.mapManager.addSource(this.sourceId, data);
+
+            // Add or update the occupation layer with fixed property names
+            this.addOrUpdateLayer(
+                'occupation-layer',
+                this.sourceId,
+                'openings_2024_zscore_color', // Fixed property name for categories
+                'visible',
+                `Occupation: ${occupationId}`,
+                'openings_2024_zscore' // Fixed property name for z-scores
+            );
+
+            // Update export link to use new endpoint
+            this.updateOccupationExportLink(occupationId);
+
+            uiService.hideLoading('loading');
+
+            // Performance feedback
+            const loadTime = Math.round(performance.now() - startTime);
+            console.log(`[OccupationController] Loaded ${occupationId} in ${loadTime}ms (cache: ${cacheHit ? 'HIT' : 'MISS'})`);
+            
+            // Show cache stats in development
+            if (process.env.NODE_ENV === 'development') {
+                console.log('[OccupationCache] Stats:', this.occupationCache.getDebugInfo());
+            }
+
+            // Success notification with performance info
+            uiService.showNotification({
+                type: 'success',
+                message: `Loaded occupation data ${cacheHit ? 'from cache' : ''} (${loadTime}ms)`,
+                duration: 2000
+            });
+
+        } catch (error) {
+            const err = error instanceof Error ? error : new Error(String(error));
+            ErrorHandler.logError(err, 'Load Occupation Data', { occupationId });
+            this.showError('loading', 'Error loading occupation data');
+            uiService.showNotification({
+                type: 'error',
+                message: 'Failed to load occupation data. Please try again.',
+                duration: 10000
+            });
+        }
+    }
+
+    private updateOccupationExportLink(occupationId: string): void {
+        const exportElement = document.getElementById('exp') as HTMLAnchorElement | null;
+        if (exportElement) {
+            exportElement.href = this.apiService.getOccupationExportUrl(occupationId);
+            
+            // Add download attribute with timestamp
+            const timestamp = new Date().toISOString().slice(0, 10);
+            const fileName = `occupation_${occupationId}_${timestamp}.geojson`;
+            exportElement.download = fileName;
+        }
     }
     
     protected clearMap(): void {
         super.clearMap();
-        this.currentOccupationId = null;
     }
 
     protected getLayerIds(): string[] {
@@ -145,6 +246,22 @@ export class OccupationMapController extends BaseMapController {
      */
     clearOccupationCache(): void {
         this.cacheService.remove(this.CACHE_KEY);
+    }
+    
+    /**
+     * Clear all occupation data caches
+     */
+    clearAllCaches(): void {
+        this.clearOccupationCache();
+        this.occupationCache.clear();
+        console.log('[OccupationController] All caches cleared');
+    }
+    
+    /**
+     * Get cache statistics for debugging
+     */
+    getCacheStats(): any {
+        return this.occupationCache.getDebugInfo();
     }
     
     /**
